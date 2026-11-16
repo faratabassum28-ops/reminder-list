@@ -89,17 +89,33 @@ const app = express();
 // In production, Render (backend) and Vercel (frontend) live on different
 // domains, so the browser needs an explicit CORS allow-list. Set
 // FRONTEND_URL in Render's environment variables to your Vercel URL(s),
-// comma-separated if you have more than one (e.g. a preview + prod domain).
-// With no FRONTEND_URL set, all origins are allowed — fine for local dev.
+// comma-separated (e.g. prod + preview). Trailing slashes are ignored.
+// Any https://*.vercel.app origin is also allowed unless you set
+// ALLOW_VERCEL_PREVIEWS=0. With no FRONTEND_URL set, all origins are allowed.
+const normalizeOrigin = (s) => s.trim().replace(/\/+$/, "").toLowerCase();
 const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(",").map((s) => s.trim())
+  ? process.env.FRONTEND_URL.split(",").map(normalizeOrigin).filter(Boolean)
   : null;
+const allowVercel = process.env.ALLOW_VERCEL_PREVIEWS !== "0";
 
-app.use(
-  cors({
-    origin: allowedOrigins || true,
-  })
-);
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin || !allowedOrigins) return cb(null, true); // curl, server-to-server, local dev
+    const o = normalizeOrigin(origin);
+    if (allowedOrigins.includes(o)) return cb(null, true);
+    if (allowVercel) {
+      try {
+        if (new URL(o).hostname.endsWith(".vercel.app")) return cb(null, true);
+      } catch {}
+    }
+    console.warn(`[cors] blocked origin: ${origin} (allowed: ${allowedOrigins.join(", ")})`);
+    return cb(null, false); // no CORS headers, no thrown error
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions)); // also answers OPTIONS preflight
 // Slack button clicks + external cron hook. Must be mounted BEFORE express.json():
 // Slack signs the raw body, which the router reads itself. Auth is the Slack
 // signature / cron secret, not a login token.
