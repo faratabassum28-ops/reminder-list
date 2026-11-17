@@ -9,10 +9,13 @@ import SearchInput from "../components/SearchInput.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { avatarStyleFromString, initials } from "../utils/colorFromString.js";
 
-const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"] };
+const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [] };
 
-const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets" };
-const APPS = ["reminder", "workshop", "tickets"];
+const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics" };
+const APPS = ["reminder", "workshop", "tickets", "orders"];
+// Order Analytics desk teams: Confirmation calls and confirms new orders, Dispatch slips / packs / hands over.
+const TEAM_LABEL = { confirmation: "Confirmation", packing: "Dispatch" };
+const TEAMS = ["confirmation", "packing"];
 
 export default function Users() {
   const { user: currentUser } = useAuth();
@@ -38,6 +41,10 @@ export default function Users() {
     e.preventDefault();
     if (form.role !== "admin" && form.apps.length === 0) {
       toast("Pick at least one app for this user", "bad");
+      return;
+    }
+    if (form.role !== "admin" && form.apps.includes("orders") && form.ordersRoles.length === 0) {
+      toast("Order Analytics needs a desk team: pick Confirmation and/or Dispatch", "bad");
       return;
     }
     try {
@@ -85,11 +92,33 @@ export default function Users() {
       toast("A user needs at least one app — deactivate them instead", "bad");
       return;
     }
+    // Order Analytics needs a desk team. Switching it on starts with Confirmation (adjust with the team chips that appear).
+    const body = { apps: next };
+    if (app === "orders" && !has && !(u.ordersRoles || []).length) body.ordersRoles = ["confirmation"];
     setBusyId(u._id);
     try {
-      const updated = await api.updateUser(u._id, { apps: next });
+      const updated = await api.updateUser(u._id, body);
       setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
       toast(`${u.name}: ${APP_LABEL[app]} access ${has ? "removed" : "added"}`, "good");
+    } catch (err) {
+      toast(err.message, "bad");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleTeam = async (u, team) => {
+    const cur = u.ordersRoles || [];
+    const next = cur.includes(team) ? cur.filter((t) => t !== team) : [...cur, team];
+    if (next.length === 0) {
+      toast("Order Analytics needs at least one desk team — remove the app instead", "bad");
+      return;
+    }
+    setBusyId(u._id);
+    try {
+      const updated = await api.updateUser(u._id, { ordersRoles: next });
+      setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
+      toast(`${u.name}: ${TEAM_LABEL[team]} desk ${cur.includes(team) ? "removed" : "added"}`, "good");
     } catch (err) {
       toast(err.message, "bad");
     } finally {
@@ -195,6 +224,15 @@ export default function Users() {
             /> {APP_LABEL[app]}
           </label>
         ))}
+        {form.role !== "admin" && form.apps.includes("orders") && TEAMS.map((t) => (
+          <label key={t} className="ws-inline-check" title={t === "confirmation" ? "Calls and confirms new orders" : "Prints slips, packs and hands orders to the courier"}>
+            <input
+              type="checkbox"
+              checked={form.ordersRoles.includes(t)}
+              onChange={(e) => setForm({ ...form, ordersRoles: e.target.checked ? [...form.ordersRoles, t] : form.ordersRoles.filter((x) => x !== t) })}
+            /> {TEAM_LABEL[t]} desk
+          </label>
+        ))}
         <label className="ws-inline-check" title="Lets this person fill the New Workshop form in Workshop PMS (admins approve)">
           <input type="checkbox" checked={form.canRequestWorkshops} onChange={(e) => setForm({ ...form, canRequestWorkshops: e.target.checked })} /> Workshop coordinator
         </label>
@@ -204,12 +242,12 @@ export default function Users() {
         <strong>Admins</strong> can delete data, manage Settings, and manage other accounts. <strong>Members</strong> can
         do day-to-day work — add, edit, complete, export — but not delete anything or reach Settings/Users. Slack ID is
         optional; people can also set their own from the Account page. <strong>App access</strong> decides which app a
-        person can open — Reminder List, Workshop PMS, Help Tickets, or any mix (admins always get all). A person with only one app
+        person can open — Reminder List, Workshop PMS, Help Tickets, or any mix (admins always get all). <strong>Order Analytics</strong> is switched on per person and needs a desk team — Confirmation and/or Dispatch — which decides what they see there; admins see everything. A person with only one app
         goes straight into it and never sees the others.
       </p>
 
       <div className="range-pills" role="tablist" aria-label="Filter users by app" style={{ marginBottom: 10 }}>
-        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"]].map(([id, label]) => (
+        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"]].map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={appTab === id}
             className={"range-pill" + (appTab === id ? " range-pill-active" : "")} onClick={() => setAppTab(id)}>
             {label}{users ? ` (${id === "all" ? users.length : users.filter((u) => u.apps.includes(id)).length})` : ""}
@@ -287,6 +325,23 @@ export default function Users() {
                       </button>
                     );
                   })}
+                  {u.role !== "admin" && u.apps.includes("orders") && (
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span className="muted" style={{ fontSize: 12 }}>Order desk:</span>
+                      {TEAMS.map((t) => {
+                        const on = (u.ordersRoles || []).includes(t);
+                        return (
+                          <button key={t} type="button"
+                            className={"role-toggle " + (on ? "role-admin" : "role-member")}
+                            disabled={busyId === u._id}
+                            onClick={() => toggleTeam(u, t)}
+                            title={`Click to ${on ? "remove" : "add"} the ${TEAM_LABEL[t]} desk`}>
+                            {on ? "✓ " : "+ "}{TEAM_LABEL[t]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </td>
                 <td>
                   {slackEditId === u._id ? (

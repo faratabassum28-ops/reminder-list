@@ -14,6 +14,7 @@ const Account = lazyRetry(() => import("./pages/Account.jsx"));
 const TicketsApp = lazyRetry(() => import("./tickets/TicketsApp.jsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.jsx"));
 const WorkshopApp = lazyRetry(() => import("./workshops/WorkshopApp.jsx"));
+const OrdersApp = lazyRetry(() => import("./orders/OrdersApp.jsx"));
 import Login from "./pages/Login.jsx";
 import ShortcutsHelp from "./components/ShortcutsHelp.jsx";
 import Logo from "./components/Logo.jsx";
@@ -76,7 +77,7 @@ const prefetchPages = () => {
 };
 
 export default function App() {
-  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, canRequestWorkshops } = useAuth();
+  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, canRequestWorkshops } = useAuth();
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -119,17 +120,18 @@ export default function App() {
   if (loading) return <LoadingScreen slow={slow} />;
   if (!user) return <Login />;
 
-  // Separate access per app: Reminder List, Workshop PMS and Help Tickets
-  // are three independent apps. A person only ever sees the ones their
+  // Separate access per app: Reminder List, Workshop PMS, Help Tickets and
+  // Order Analytics are four independent apps. A person only ever sees the ones their
   // account was given; someone with a single app goes straight into it and
   // never sees the chooser, everyone else picks from the chooser (/hub).
-  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets };
+  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets, orders: hasOrders };
   const appCount = Object.values(apps).filter(Boolean).length;
   const onlyApp = appCount === 1 ? Object.keys(apps).find((k) => apps[k]) : null;
-  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets" };
+  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets", orders: "/orders" };
   const inWorkshops = pathname === "/workshops" || pathname.startsWith("/workshops/");
   const inTickets = pathname === "/tickets" || pathname.startsWith("/tickets/");
-  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : "reminder";
+  const inOrders = pathname === "/orders" || pathname.startsWith("/orders/");
+  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : "reminder";
 
   if (appCount === 0) {
     return (
@@ -170,6 +172,15 @@ export default function App() {
       <Suspense fallback={<LoadingScreen app="tickets" message="Opening Help Tickets" />}>
         <Routes>
           <Route path="/tickets/*" element={<TicketsApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+  if (inOrders) {
+    return (
+      <Suspense fallback={<LoadingScreen app="orders" message="Opening Order Analytics" />}>
+        <Routes>
+          <Route path="/orders/*" element={<OrdersApp />} />
         </Routes>
       </Suspense>
     );

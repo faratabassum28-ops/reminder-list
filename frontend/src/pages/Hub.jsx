@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import Logo from "../components/Logo.jsx";
 import WorkshopLogo from "../components/WorkshopLogo.jsx";
 import TicketsLogo from "../components/TicketsLogo.jsx";
+import OrdersLogo from "../components/OrdersLogo.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import SchoolBrand from "../components/SchoolLogo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
+import { api as ordersApi } from "../orders/api.js";
 import "./hub.css";
 
 const greeting = () => {
@@ -15,11 +17,12 @@ const greeting = () => {
 };
 
 export default function Hub() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets } = useAuth();
+  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders } = useAuth();
   const navigate = useNavigate();
   const [wsStats, setWsStats] = useState(null);
   const [remStats, setRemStats] = useState(null);
   const [tkCount, setTkCount] = useState(null);
+  const [orderCount, setOrderCount] = useState(null);
 
   // Light "what's waiting for you" numbers on each card. Failures are silent —
   // the chooser must always open, even if a stat can't load.
@@ -27,6 +30,7 @@ export default function Hub() {
     if (hasWorkshop) api.wsStats().then(setWsStats).catch(() => {});
     if (hasReminder) api.getMyPerformance?.().then(setRemStats).catch(() => {});
     if (hasTickets) api.getTicketCount().then(setTkCount).catch(() => {});
+    if (hasOrders) ordersApi.get("/desk/counts").then(setOrderCount).catch(() => {});
   }, []);
 
   const open = (to) => {
@@ -115,6 +119,30 @@ export default function Hub() {
               {isAdmin && tkCount?.open > 0 && <span className="hub-pill hub-pill-alert">{tkCount.open} open across the team</span>}
               {tkCount && !tkCount.inbox && !(isAdmin && tkCount.open > 0) && <span className="hub-pill">Nothing waiting on you</span>}
               {!tkCount && <span className="hub-pill hub-pill-quiet">Open</span>}
+            </div>
+          </button>}
+          {hasOrders && <button type="button" className="hub-card hub-card-orders" onClick={() => open("/orders")}>
+            <div className="hub-card-head">
+              <OrdersLogo size={54} />
+              <span className="hub-card-arrow" aria-hidden="true">→</span>
+            </div>
+            <h2>Order Analytics</h2>
+            <p>Confirm, dispatch and track every Shopify order, with live Sheet, Shopify and Shipway data.</p>
+            <ul className="hub-card-points">
+              <li>Shopify desk · confirm &amp; dispatch queues</li>
+              <li>NDR · RTO · Weight discrepancy</li>
+              <li>Overview, Trends &amp; Team performance</li>
+            </ul>
+            <div className="hub-card-foot">
+              {orderCount?.confirm?.due + orderCount?.pending?.due > 0 && (
+                <span className="hub-pill hub-pill-bad">{orderCount.confirm.due + orderCount.pending.due} call{orderCount.confirm.due + orderCount.pending.due === 1 ? "" : "s"} due now</span>
+              )}
+              {orderCount?.confirm?.total + orderCount?.pending?.total > 0 && !(orderCount.confirm.due + orderCount.pending.due > 0) && (
+                <span className="hub-pill hub-pill-alert">{orderCount.confirm.total + orderCount.pending.total} to confirm</span>
+              )}
+              {orderCount?.dispatch > 0 && <span className="hub-pill hub-pill-alert">{orderCount.dispatch} to dispatch</span>}
+              {orderCount && !(orderCount.confirm?.total + orderCount.pending?.total > 0) && !(orderCount.dispatch > 0) && <span className="hub-pill">All caught up</span>}
+              {!orderCount && <span className="hub-pill hub-pill-quiet">Open</span>}
             </div>
           </button>}
         </div>

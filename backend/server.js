@@ -20,6 +20,8 @@ import messageRoutes from "./routes/messages.js";
 import workshopRoutes from "./routes/workshops.js";
 import ticketRoutes from "./routes/tickets.js";
 import slackRoutes from "./routes/slack.js";
+import orders from "./orders/index.js";
+import { syncOrdersTeam } from "./utils/ordersTeam.js";
 import { runTicketReminders, inReminderWindow } from "./utils/ticketReminders.js";
 import { getSettings } from "./models/Settings.js";
 import { sendDailyReminders } from "./utils/sendDailyReminders.js";
@@ -121,7 +123,8 @@ app.use(cors(corsOptions)); // also answers OPTIONS preflight
 // signature / cron secret, not a login token.
 app.use("/api/slack", slackRoutes);
 // Proof screenshots arrive as (client-resized) data URLs, so allow more than the 100kb default.
-app.use(express.json({ limit: "3mb" }));
+// The raw body is kept for the Shopify webhook only: its signature is computed over the exact bytes.
+app.use(express.json({ limit: "3mb", verify: (req, res, buf) => { if (req.originalUrl.startsWith("/api/orders/webhook/shopify")) req.rawBody = buf; } }));
 // Gzip every response — the Master and Submission Log pages return
 // hundreds-to-thousands of JSON rows and the CSV exports are much larger
 // still; compressing those cuts transfer time noticeably, especially for
@@ -163,6 +166,14 @@ app.use("/api/tickets", requireAuth, requireApp("tickets"), ticketRoutes);
 // templates and the Launch Verification hand-off are admin-only inside the
 // router itself.
 app.use("/api/workshops", requireAuth, requireApp("workshop"), workshopRoutes);
+// Order Analytics — the 4th app, living in ./orders (its own folder + its own
+// database, so nothing collides with the other apps). Everyone people use goes
+// through the hub's own login + the "orders" app check; the few public entry
+// points (Sheet/Shopify webhooks, cron trigger, Shopify approval callback) carry
+// their own secret or signature instead. Admins see everything inside it; other
+// people see the desk team(s) (Confirmation / Dispatch) set on the Users page.
+app.use("/api/orders", orders.publicRouter);
+app.use("/api/orders", requireAuth, requireApp("orders"), orders.router);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/reminder_list";
@@ -245,6 +256,10 @@ mongoose
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     startKeepAlive();
     setTimeout(ticketReminderTick, 30_000).unref();
+    // Order Analytics: mirror who is on its desks, then start its background jobs
+    // (sheet / Shopify / Shipway sync, follow-up timers). ORDERS_SYNC=0 switches the jobs off (e.g. a second instance).
+    syncOrdersTeam({ delayMs: 3_000 });
+    if (process.env.ORDERS_SYNC !== "0") orders.start();
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err.message);

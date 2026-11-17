@@ -60,3 +60,4 @@
 @keyframes hub-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 .hub-card-tickets { --tone: #0e9aa7; animation-delay: 0.16s; }
+.hub-card-orders { --tone: #1d8a63; animation-delay: 0.24s; }

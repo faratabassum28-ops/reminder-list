@@ -36,7 +36,7 @@ const I = {
 };
 
 export default function WorkshopApp() {
-  const { user, logout, isAdmin, canRequestWorkshops, hasReminder, hasTickets } = useAuth();
+  const { user, logout, isAdmin, canRequestWorkshops, hasReminder, hasTickets, hasOrders } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("ws-sidebar-collapsed") === "1");
@@ -119,7 +119,7 @@ export default function WorkshopApp() {
               {l.badge > 0 && !collapsed && <span className={"nav-badge" + (l.bad ? " ws-badge-bad" : "")}>{l.badge > 9 ? "9+" : l.badge}</span>}
             </NavLink>
           ))}
-          {(hasReminder || hasTickets) && (
+          {(hasReminder || hasTickets || hasOrders) && (
           <button type="button" className="nav-link ws-switch" onClick={backToHub} title="Switch app">
             <span className="nav-icon-wrap">
               <svg className="nav-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
