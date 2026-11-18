@@ -21,6 +21,7 @@ import workshopRoutes from "./routes/workshops.js";
 import ticketRoutes from "./routes/tickets.js";
 import slackRoutes from "./routes/slack.js";
 import orders from "./orders/index.js";
+import certificates from "./certificates/index.js";
 import { syncOrdersTeam } from "./utils/ordersTeam.js";
 import { runTicketReminders, inReminderWindow } from "./utils/ticketReminders.js";
 import { getSettings } from "./models/Settings.js";
@@ -174,6 +175,10 @@ app.use("/api/workshops", requireAuth, requireApp("workshop"), workshopRoutes);
 // people see the desk team(s) (Confirmation / Dispatch) set on the Users page.
 app.use("/api/orders", orders.publicRouter);
 app.use("/api/orders", requireAuth, requireApp("orders"), orders.router);
+// Certificate Studio — the 5th app, living in ./certificates (data in cert_* collections of the hub's own database).
+// Uses the hub's login. Hub admins are Certificate Studio admins (templates, team-wide edits, change-request approvals);
+// everyone else who was given the app is a coordinator (issue + download certificates, request changes).
+app.use("/api/certificates", requireAuth, requireApp("certificates"), certificates.router);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/reminder_list";
@@ -258,6 +263,7 @@ mongoose
     setTimeout(ticketReminderTick, 30_000).unref();
     // Order Analytics: mirror who is on its desks, then start its background jobs
     // (sheet / Shopify / Shipway sync, follow-up timers). ORDERS_SYNC=0 switches the jobs off (e.g. a second instance).
+    certificates.checkImages();
     syncOrdersTeam({ delayMs: 3_000 });
     if (process.env.ORDERS_SYNC !== "0") orders.start();
   })

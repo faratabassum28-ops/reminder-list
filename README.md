@@ -64,6 +64,13 @@ claimed atomically per ticket, so it can never double-send. Admins can also trig
 5. Free-tier hosting that sleeps: add a cron-job.org job (every 30 min) calling
    `GET https://<your-backend>/api/slack/reminders?key=<TICKET_CRON_SECRET>`.
 
+## Certificate Studio (5th app)
+
+Upload a blank certificate once, mark where the name / date / certificate ID go, then issue PNG / PDF certificates for one
+student or a whole batch (ZIP) — one certificate per student per program, corrections via admin-approved change requests.
+Lives at `/certificates`, uses the hub login; switch it on per person on the **Users** page. Details, roles and how to move
+data from the old standalone app: see **CERTIFICATES-INTEGRATION.md**.
+
 ## Workshop PMS (sub-site)
 
 ### Loading the Workshop history (one command)
