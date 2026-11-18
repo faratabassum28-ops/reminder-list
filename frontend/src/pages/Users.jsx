@@ -11,8 +11,8 @@ import { avatarStyleFromString, initials } from "../utils/colorFromString.js";
 
 const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [] };
 
-const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics" };
-const APPS = ["reminder", "workshop", "tickets", "orders"];
+const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio" };
+const APPS = ["reminder", "workshop", "tickets", "orders", "certificates"];
 // Order Analytics desk teams: Confirmation calls and confirms new orders, Dispatch slips / packs / hands over.
 const TEAM_LABEL = { confirmation: "Confirmation", packing: "Dispatch" };
 const TEAMS = ["confirmation", "packing"];
@@ -242,12 +242,12 @@ export default function Users() {
         <strong>Admins</strong> can delete data, manage Settings, and manage other accounts. <strong>Members</strong> can
         do day-to-day work — add, edit, complete, export — but not delete anything or reach Settings/Users. Slack ID is
         optional; people can also set their own from the Account page. <strong>App access</strong> decides which app a
-        person can open — Reminder List, Workshop PMS, Help Tickets, or any mix (admins always get all). <strong>Order Analytics</strong> is switched on per person and needs a desk team — Confirmation and/or Dispatch — which decides what they see there; admins see everything. A person with only one app
+        person can open — Reminder List, Workshop PMS, Help Tickets, Certificate Studio, or any mix (admins always get all). In Certificate Studio, admins manage templates and approve change requests; everyone else is a coordinator who issues certificates. <strong>Order Analytics</strong> is switched on per person and needs a desk team — Confirmation and/or Dispatch — which decides what they see there; admins see everything. A person with only one app
         goes straight into it and never sees the others.
       </p>
 
       <div className="range-pills" role="tablist" aria-label="Filter users by app" style={{ marginBottom: 10 }}>
-        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"]].map(([id, label]) => (
+        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"], ["certificates", "Certificate Studio users"]].map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={appTab === id}
             className={"range-pill" + (appTab === id ? " range-pill-active" : "")} onClick={() => setAppTab(id)}>
             {label}{users ? ` (${id === "all" ? users.length : users.filter((u) => u.apps.includes(id)).length})` : ""}

@@ -3,6 +3,7 @@ import Logo from "./Logo.jsx";
 import WorkshopLogo from "./WorkshopLogo.jsx";
 import TicketsLogo from "./TicketsLogo.jsx";
 import OrdersLogo from "./OrdersLogo.jsx";
+import CertificatesLogo from "./CertificatesLogo.jsx";
 import OfflineScreen from "./OfflineScreen.jsx";
 import { useNetwork } from "../context/NetworkContext.jsx";
 
@@ -20,6 +21,7 @@ const APPS = {
   workshop: { Mark: WorkshopLogo, name: "Workshop PMS", cls: "ls-workshop" },
   tickets: { Mark: TicketsLogo, name: "Help Tickets", cls: "ls-tickets" },
   orders: { Mark: OrdersLogo, name: "Order Analytics", cls: "ls-orders" },
+  certificates: { Mark: CertificatesLogo, name: "Certificate Studio", cls: "ls-certificates" },
 };
 
 const STEPS = ["Getting things ready", "Checking your session", "Loading your workspace", "Almost there"];

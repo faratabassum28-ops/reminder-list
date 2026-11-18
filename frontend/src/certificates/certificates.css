@@ -1,0 +1,175 @@
+/* ---------------------------------------------------------------------
+   Certificate Studio inside the hub. Every class is prefixed `cs-` so it can never touch the other apps, and all colours
+   come from the hub's design tokens, so the app follows the hub's light / dark theme. `.cs-scope` re-tints the accent to
+   rose so it reads as its own place next to the purple, amber, teal and green apps.
+------------------------------------------------------------------------*/
+.cs-scope {
+  --accent: #b8315f;
+  --accent-dark: #8f2249;
+  --accent-light: #fbe5ec;
+  --accent-2: #c43d6b;
+}
+:root[data-theme="dark"] .cs-scope {
+  --accent: #ee7a9f;
+  --accent-dark: #f4a0bb;
+  --accent-light: rgba(238, 122, 159, 0.16);
+  --accent-2: #f08aab;
+}
+.cs-scope .sidebar { background: linear-gradient(190deg, #2b1520, #170b12); }
+.cs-scope .nav-link.active { background: rgba(229, 98, 143, 0.22); }
+.cs-scope .nav-link.cs-switch { width: 100%; background: none; border: none; font: inherit; text-align: left; cursor: pointer; margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0 0 8px 8px; padding-top: 12px; opacity: 0.85; }
+.cs-scope .content { min-width: 0; }
+
+/* ---- sidebar: quick pick list ---- */
+.cs-side-picker { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.cs-side-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #8b93a3; padding: 0 4px; }
+.cs-side-search { width: 100%; padding: 7px 10px; font: inherit; font-size: 12.5px; color: #e7e9ef; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; }
+.cs-side-search::placeholder { color: #8b93a3; }
+.cs-side-search:focus { outline: none; border-color: #e5628f; }
+.cs-side-list { display: flex; flex-direction: column; gap: 2px; }
+.cs-side-note { margin: 0; padding: 4px; font-size: 12px; color: #8b93a3; }
+.cs-side-item { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; text-decoration: none; color: #b7bdc9; font-size: 12.5px; line-height: 1.3; border: 1px solid transparent; }
+.cs-side-item:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.cs-side-item.active { background: rgba(229, 98, 143, 0.2); border-color: rgba(229, 98, 143, 0.4); color: #fff; }
+.cs-side-thumb { width: 52px; height: 36px; flex: none; border-radius: 5px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
+.cs-side-thumb .cs-thumb-box { width: 100%; height: 100%; }
+.cs-side-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cs-side-text { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.cs-side-name { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cs-side-code { font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: 0.04em; color: #8b93a3; }
+
+/* ---- page chrome ---- */
+.cs-page { min-width: 0; }
+.cs-muted { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.cs-h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.cs-row { display: flex; align-items: center; }
+.cs-gap { gap: 8px; }
+.cs-wrap { flex-wrap: wrap; }
+.cs-grow { flex: 1; min-width: 0; }
+.cs-narrow { max-width: 620px; }
+.cs-scope hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+.cs-scope code, .cs-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+  background: var(--panel-alt); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--ink);
+}
+.cs-code { font-weight: 600; letter-spacing: 0.03em; color: var(--muted); }
+
+.cs-error { color: var(--bad); background: var(--bad-bg); border: 1px solid transparent; padding: 9px 12px; border-radius: 8px; font-size: 13.5px; margin: 0 0 12px; }
+.cs-ok { color: var(--good); background: var(--good-bg); padding: 9px 12px; border-radius: 8px; font-size: 13.5px; margin: 0 0 12px; }
+
+/* ---- buttons ---- */
+.cs-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 7px 15px;
+  border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); border-radius: 8px;
+  font: inherit; font-size: 13.5px; font-weight: 600; line-height: 1.2; cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+.cs-btn:hover { background: var(--panel-alt); border-color: var(--accent); color: var(--ink); }
+.cs-btn:active { transform: translateY(1px); }
+.cs-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .cs-btn.primary { color: #1a0a11; }
+.cs-btn.primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+:root[data-theme="dark"] .cs-btn.primary:hover { color: #1a0a11; }
+.cs-btn.danger { color: var(--bad); }
+.cs-btn.danger:hover { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+.cs-btn.small { min-height: 30px; padding: 4px 11px; font-size: 12.5px; }
+.cs-btn.block { display: flex; width: 100%; }
+.cs-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.cs-linklike { background: none; border: 0; padding: 0; margin: 0 0 14px; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; text-align: left; }
+.cs-linklike:hover { text-decoration: underline; }
+
+/* ---- inputs ---- */
+.cs-search, .cs-select, .cs-field input:not([type="color"]):not([type="range"]):not([type="checkbox"]), .cs-field select, .cs-field textarea {
+  min-height: 38px; padding: 8px 11px; width: 100%; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px;
+}
+.cs-select { width: auto; }
+.cs-search { margin-bottom: 14px; max-width: 420px; }
+.cs-filters .cs-search { margin-bottom: 0; max-width: none; }
+.cs-field textarea { min-height: 120px; resize: vertical; line-height: 1.45; }
+.cs-search:focus, .cs-select:focus, .cs-field input:focus, .cs-field select:focus, .cs-field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.cs-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 13px; }
+.cs-field > span { color: var(--ink); font-weight: 600; font-size: 12.5px; }
+.cs-field input[type="range"] { width: 100%; accent-color: var(--accent); }
+.cs-check { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; font-size: 13.5px; }
+.cs-check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.cs-filters { margin: 4px 0 14px; }
+
+/* ---- panels / cards ---- */
+.cs-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow-panel); }
+.cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
+.cs-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-panel); transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s; }
+.cs-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); }
+.cs-thumb { display: block; background: var(--panel-alt); aspect-ratio: 4 / 3; border-bottom: 1px solid var(--line); }
+.cs-thumb .cs-thumb-box { width: 100%; height: 100%; }
+.cs-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cs-thumb-box { position: relative; }
+.cs-thumb-skel { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(128, 128, 128, 0.14) 50%, transparent 70%); background-size: 200% 100%; animation: cs-shimmer 1.3s linear infinite; }
+@keyframes cs-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.cs-thumb-missing { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 36px; background: var(--bad-bg); color: var(--bad); font-size: 11px; border-radius: 5px; }
+.cs-card-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.cs-card-title { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.cs-card-title strong { max-width: 100%; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-empty { text-align: center; padding: 64px 0; color: var(--muted); }
+.cs-empty .cs-btn { margin-top: 6px; }
+
+.cs-drop { display: flex; align-items: center; justify-content: center; min-height: 200px; margin: 16px 0 10px; border: 2px dashed var(--line-strong); border-radius: 14px; background: var(--panel-alt); cursor: pointer; color: var(--muted); overflow: hidden; transition: border-color 0.15s, background 0.15s; }
+.cs-drop:hover { border-color: var(--accent); background: var(--accent-light); }
+.cs-drop img { width: 100%; display: block; }
+
+/* ---- colour control ---- */
+.cs-color-row { display: flex; gap: 8px; align-items: center; }
+.cs-color-row input[type="color"] { width: 48px; height: 38px; padding: 3px; flex: none; cursor: pointer; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); }
+.cs-hex { font-family: ui-monospace, monospace; text-transform: lowercase; }
+.cs-swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+.cs-swatch { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(128, 128, 128, 0.5); cursor: pointer; padding: 0; transition: transform 0.12s; }
+.cs-swatch:hover { transform: scale(1.1); }
+.cs-swatch.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cs-style-box { border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 4px; margin-bottom: 14px; background: var(--panel-alt); }
+
+/* ---- editor / generator ---- */
+.cs-editor { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start; }
+@media (max-width: 1100px) { .cs-editor { grid-template-columns: 1fr; } }
+/* the certificate itself stays on a light surface in both themes: it is a picture of paper */
+.cs-stage { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; touch-action: none; line-height: 0; box-shadow: var(--shadow-panel); }
+.cs-canvas { width: 100%; height: auto; display: block; }
+.cs-editor .cs-side { position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow-y: auto; scrollbar-width: thin; }
+@media (max-width: 1100px) { .cs-editor .cs-side { position: static; max-height: none; } }
+.cs-tabs { display: flex; gap: 4px; margin-bottom: 18px; padding: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.cs-tabs-short { max-width: 360px; margin: 0 0 14px; }
+.cs-tab { flex: 1; padding: 7px 8px; border: 0; background: transparent; color: var(--muted); border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+.cs-tab:hover { color: var(--ink); }
+.cs-tab.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-panel); }
+.cs-nudge { display: flex; gap: 6px; }
+.cs-marker { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #b8315f; background: rgba(184, 49, 95, 0.22); pointer-events: none; }
+.cs-marker i { position: absolute; left: 18px; top: -4px; font-style: normal; font-size: 11px; line-height: 1; background: #b8315f; color: #fff; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+.cs-marker.active { background: #b8315f; }
+.cs-missing { display: flex; flex-direction: column; gap: 6px; padding: 48px 24px; text-align: center; line-height: 1.5; background: var(--bad-bg); color: var(--bad); }
+.cs-missing span { color: var(--ink); font-size: 14px; }
+
+/* ---- duplicates, tables, dialogs ---- */
+.cs-warn { border: 1px solid var(--check-border); background: var(--check-bg); color: var(--ink); border-radius: 10px; padding: 12px 14px; margin-top: 14px; font-size: 13px; }
+.cs-warn small { display: block; margin: 4px 0 10px; color: var(--muted); }
+.cs-warn ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cs-warn li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cs-tablewrap { padding: 0; overflow-x: auto; }
+.cs-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cs-table th { text-align: left; color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--panel-alt); }
+.cs-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.cs-table tbody tr:last-child td { border-bottom: 0; }
+.cs-table tbody tr:hover td { background: var(--panel-alt); }
+.cs-table td.cs-actions { text-align: right; white-space: nowrap; }
+.cs-table td.cs-actions .cs-btn { margin-left: 6px; }
+.cs-pager { justify-content: center; margin-top: 16px; }
+.cs-modal-back { position: fixed; inset: 0; background: rgba(10, 8, 12, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.cs-modal { width: 100%; max-width: 460px; max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); }
+.cs-modal .cs-row { margin-top: 8px; }
+.cs-diff { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cs-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; text-transform: capitalize; background: var(--panel-alt); color: var(--muted); }
+.cs-pill.pending { background: var(--warn-bg); color: var(--warn); }
+.cs-pill.approved { background: var(--good-bg); color: var(--good); }
+.cs-pill.rejected { background: var(--bad-bg); color: var(--bad); }
+
+/* the sidebar header is narrow: let the name wrap onto two lines instead of being clipped */
+.cs-scope .brand-title { white-space: normal; line-height: 1.15; }
+.cs-scope .brand-sub { display: none; }

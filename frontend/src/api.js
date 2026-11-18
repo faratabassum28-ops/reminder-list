@@ -23,6 +23,13 @@ export function setAuthToken(token) {
   }
 }
 
+// Other apps' own fetch helpers (Certificate Studio uploads FormData, so it can't use request() below) call this
+// when the server says 401, so an expired session signs the person out exactly like everywhere else.
+export function handleUnauthorized() {
+  setAuthToken(null);
+  onUnauthorized?.();
+}
+
 // AuthContext registers a callback here so that ANY request
 // that returns 401 sends the user back to login.
 export function setUnauthorizedHandler(fn) {
@@ -33,7 +40,7 @@ export function setUnauthorizedHandler(fn) {
 // DNS failure, server down, CORS block). Turn that into a friendly error
 // flagged `.network = true` and tell the NetworkProvider so it can verify
 // the connection and show the right "offline" / "server unreachable" UI.
-async function netFetch(url, init) {
+export async function netFetch(url, init) {
   try {
     return await fetch(url, init);
   } catch (e) {

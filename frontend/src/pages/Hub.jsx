@@ -4,11 +4,13 @@ import Logo from "../components/Logo.jsx";
 import WorkshopLogo from "../components/WorkshopLogo.jsx";
 import TicketsLogo from "../components/TicketsLogo.jsx";
 import OrdersLogo from "../components/OrdersLogo.jsx";
+import CertificatesLogo from "../components/CertificatesLogo.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import SchoolBrand from "../components/SchoolLogo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
 import { api as ordersApi } from "../orders/api.js";
+import { certApi } from "../certificates/api.js";
 import "./hub.css";
 
 const greeting = () => {
@@ -17,12 +19,13 @@ const greeting = () => {
 };
 
 export default function Hub() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders } = useAuth();
+  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates } = useAuth();
   const navigate = useNavigate();
   const [wsStats, setWsStats] = useState(null);
   const [remStats, setRemStats] = useState(null);
   const [tkCount, setTkCount] = useState(null);
   const [orderCount, setOrderCount] = useState(null);
+  const [certSummary, setCertSummary] = useState(null);
 
   // Light "what's waiting for you" numbers on each card. Failures are silent —
   // the chooser must always open, even if a stat can't load.
@@ -31,6 +34,7 @@ export default function Hub() {
     if (hasReminder) api.getMyPerformance?.().then(setRemStats).catch(() => {});
     if (hasTickets) api.getTicketCount().then(setTkCount).catch(() => {});
     if (hasOrders) ordersApi.get("/desk/counts").then(setOrderCount).catch(() => {});
+    if (hasCertificates) certApi.summary().then(setCertSummary).catch(() => {});
   }, []);
 
   const open = (to) => {
@@ -143,6 +147,25 @@ export default function Hub() {
               {orderCount?.dispatch > 0 && <span className="hub-pill hub-pill-alert">{orderCount.dispatch} to dispatch</span>}
               {orderCount && !(orderCount.confirm?.total + orderCount.pending?.total > 0) && !(orderCount.dispatch > 0) && <span className="hub-pill">All caught up</span>}
               {!orderCount && <span className="hub-pill hub-pill-quiet">Open</span>}
+            </div>
+          </button>}
+          {hasCertificates && <button type="button" className="hub-card hub-card-certificates" onClick={() => open("/certificates")}>
+            <div className="hub-card-head">
+              <CertificatesLogo size={54} />
+              <span className="hub-card-arrow" aria-hidden="true">→</span>
+            </div>
+            <h2>Certificate Studio</h2>
+            <p>Upload a blank certificate once, then issue named, dated PNG / PDF certificates for one student or a whole batch.</p>
+            <ul className="hub-card-points">
+              <li>Name &amp; date placed perfectly, every time</li>
+              <li>Bulk issue as a ZIP · one certificate per student</li>
+              <li>{isAdmin ? "Approve change requests" : "Request corrections from an admin"}</li>
+            </ul>
+            <div className="hub-card-foot">
+              {isAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} change request{certSummary.pending === 1 ? "" : "s"} awaiting you</span>}
+              {!isAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} of your requests pending</span>}
+              {certSummary && !(certSummary.pending > 0) && <span className="hub-pill">{certSummary.issuedThisMonth} issued this month</span>}
+              {!certSummary && <span className="hub-pill hub-pill-quiet">Open</span>}
             </div>
           </button>}
         </div>
