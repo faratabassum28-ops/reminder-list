@@ -1,39 +1,12 @@
 /* ---------------------------------------------------------------------
-   Order Analytics inside the hub.
-   Layout (sidebar, collapse, theme, mobile menu) is the hub's own. `.oa-app` re-tints it emerald so the app reads as its
-   own place next to the purple Reminder List, amber Workshop PMS and teal Help Tickets. Everything the Order Analytics
-   screens bring with them lives under `.oa-scope`, so none of it can touch the other apps (and theirs can't touch it).
-   Generated from the original Order Analytics stylesheet by scoping every selector; dark mode follows the hub's theme.
+   Order Analytics inside the hub: the ORIGINAL Order Analytics look (light, its own sidebar), scoped under `.oa-scope`
+   so nothing here can touch the other apps and nothing of theirs can touch it. Generated from the original stylesheet by
+   scoping every selector. Dark mode is Order Analytics' own switch (data-oa-theme), light by default.
 ------------------------------------------------------------------------*/
-.oa-app {
-  --accent: #1d8a63;
-  --accent-dark: #13694b;
-  --accent-light: #dff3ea;
-  --accent-2: #26a275;
-}
-:root[data-theme="dark"] .oa-app {
-  --accent: #4fc79a;
-  --accent-dark: #86dcb9;
-  --accent-light: rgba(79, 199, 154, 0.16);
-  --accent-2: #5fd0a6;
-}
-.oa-app .sidebar { background: linear-gradient(190deg, #10261d, #0a1611); }
-.oa-app .nav-link.active { background: rgba(63, 197, 141, 0.20); }
-.oa-app .nav-link.oa-sub { margin-left: 14px; padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, 0.10); border-radius: 0 8px 8px 0; font-size: 13px; }
-.oa-app .nav-link.oa-sub.active { border-left-color: #3fc58d; }
-.oa-app .nav-link .oa-nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.oa-app .nav-badge.oa-badge-bad { background: var(--bad); }
-.oa-app .nav-badge:not(.oa-badge-bad) { background: rgba(255, 255, 255, 0.16); }
-.oa-app .nav-link.oa-switch { width: 100%; background: none; border: none; font: inherit; text-align: left; cursor: pointer; margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0 0 8px 8px; padding-top: 12px; opacity: 0.85; }
-.oa-app .oa-sync { font-size: 11.5px; line-height: 1.4; color: rgba(231, 233, 239, 0.62); padding: 0 10px; margin-top: auto; }
-.oa-app .oa-sync-bad { color: #ff9b8f; }
-.oa-app .sidebar > nav { overflow-y: auto; min-height: 0; }
-/* The Order Analytics pages bring their own page padding and width. */
-.oa-app .content { padding: 0; max-width: none; min-width: 0; }
-
-/* Names the hub's own stylesheet also uses (card, chip, muted, toast, role-admin): neutralise what leaks in so the
-   Order Analytics rules below start from a clean slate. Must stay ABOVE the scoped rules. */
-.oa-scope { min-height: 100vh; min-width: 0; --ink-solid: #1c2431; }
+/* The hub's stylesheet has a few bare/shared rules that would leak in (nav stacked in a column, shared class names).
+   Neutralised here, ABOVE the scoped rules so the original rules win. */
+.oa-scope { min-height: 100vh; min-width: 0; color-scheme: light; --ink-solid: #1c2431; }
+.oa-scope nav { display: block; flex-direction: row; gap: 0; }
 .oa-scope .card { border-left: 1px solid var(--line); min-width: 0; flex: none; transition: none; }
 .oa-scope .card:hover { transform: none; box-shadow: none; }
 .oa-scope .chip { display: inline-block; gap: 0; border: 0; align-items: normal; }
@@ -41,6 +14,7 @@
 .oa-scope .toast { border-left: 0; animation: none; font-size: inherit; }
 .oa-scope .role-admin { background: none; color: inherit; }
 .oa-scope .page > * { animation: none; }
+.oa-scope .brand { display: block; align-items: normal; gap: 0; min-width: 0; }
 
 /* ---- Order Analytics stylesheet, scoped ---- */
 .oa-scope {--ink: #1c2431; --ink-2: #4a5565; --ink-3: #7b8594;
@@ -829,9 +803,28 @@
 .oa-scope .sd-stat b .pc {font-size: 14px; font-style: normal; font-weight: 600; color: var(--ink-3); letter-spacing: 0;}
 .oa-scope .pc-chip {font-size: 12px; font-weight: 600; color: var(--ink-3); margin-left: 2px;}
 .oa-scope .cq-stats {margin-top: 4px;}
+/* ---- additions for the hub: menu that folds away, footer links ---- */
+.oa-scope .side { overflow-y: auto; }
+.oa-scope .oa-sidehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.oa-scope .oa-iconbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer; color: var(--ink-2); flex: none; line-height: 1; padding: 0; }
+.oa-scope .oa-iconbtn:hover { background: var(--line-2); color: var(--ink); }
+.oa-scope .oa-foot { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; }
+.oa-scope .oa-foot .sync-note { padding: 4px 10px; }
+.oa-scope .oa-foot a { font-size: 13px; padding: 6px 10px; }
+@media (min-width: 861px) {
+  .oa-scope .shell.collapsed { grid-template-columns: 56px 1fr; }
+  .oa-scope .side.oa-rail { padding: 14px 10px; align-items: center; gap: 8px; }
+}
+@media (max-width: 860px) {
+  .oa-scope .side.oa-rail { flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 12px; }
+  .oa-scope .oa-sidehead { display: none; }
+  .oa-scope .oa-foot { flex-direction: row; flex-wrap: wrap; border-top: 0; padding-top: 0; }
+  .oa-scope .oa-foot .sync-note { display: block; }
+}
+
 
 /* ---- Dark mode (follows the hub's theme toggle) ---- */
-:root[data-theme="dark"] .oa-scope {
+.oa-scope[data-oa-theme="dark"] {
   color-scheme: dark;
   --ink: #e7e9f0; --ink-2: #b7bfce; --ink-3: #8b94a8; --ink-solid: #2f3b54;
   --paper: #10121a; --surface: #191c27; --line: #2c303f; --line-2: #222636;
@@ -844,59 +837,58 @@
   --fu1-bg: rgba(92, 192, 208, 0.14); --fu2-bg: rgba(231, 180, 85, 0.14); --fu3-bg: rgba(240, 138, 114, 0.15);
   --pend-bg: rgba(164, 138, 232, 0.16); --disp-bg: rgba(63, 207, 142, 0.14); --done-bg: rgba(140, 154, 232, 0.16); --cancel-bg: rgba(244, 116, 105, 0.15);
 }
-:root[data-theme="dark"] .oa-scope .topbar { background: rgba(16, 18, 26, 0.92); }
-:root[data-theme="dark"] .oa-scope .btn { color: #fff; }
-:root[data-theme="dark"] .oa-scope .btn.ghost { color: var(--ink); }
-:root[data-theme="dark"] .oa-scope .btn:hover { background: #3a4866; }
-:root[data-theme="dark"] .oa-scope .btn.ghost:hover { background: var(--line-2); }
-:root[data-theme="dark"] .oa-scope img { filter: none; }
+.oa-scope[data-oa-theme="dark"] .topbar { background: rgba(16, 18, 26, 0.92); }
+.oa-scope[data-oa-theme="dark"] .btn { color: #fff; }
+.oa-scope[data-oa-theme="dark"] .btn.ghost { color: var(--ink); }
+.oa-scope[data-oa-theme="dark"] .btn:hover { background: #3a4866; }
+.oa-scope[data-oa-theme="dark"] .btn.ghost:hover { background: var(--line-2); }
 
 /* auto-converted pastel/solid colours for dark mode */
-:root[data-theme="dark"] .oa-scope .banner.warn { background: #43361c; border-color: #7b6a3f; color: #eed097; }
-:root[data-theme="dark"] .oa-scope .banner.err { background: #3d1e1c; border-color: #70413c; }
-:root[data-theme="dark"] .oa-scope .chip.good { background: #283e38; }
-:root[data-theme="dark"] .oa-scope .chip.bad { background: #42211e; }
-:root[data-theme="dark"] .oa-scope th { background: #2c2f26; }
-:root[data-theme="dark"] .oa-scope tr.click:hover td { background: #2c2f26; }
-:root[data-theme="dark"] .oa-scope .tag.Delivered { background: #283e38; }
-:root[data-theme="dark"] .oa-scope .tag.RTO, :root[data-theme="dark"] .oa-scope .tag.Cancelled { background: #42211e; }
-:root[data-theme="dark"] .oa-scope .tag.In { background: #23283c; color: #9ea7d5; }
-:root[data-theme="dark"] .oa-scope .tag.Pending { background: #4a3c1c; color: #eccd96; }
-:root[data-theme="dark"] .oa-scope .sd-pay.cod { border-color: #795e42; color: #ebbc93; background: #432f18; }
-:root[data-theme="dark"] .oa-scope .sd-pay.paid { border-color: #4d6c61; background: #23372f; }
-:root[data-theme="dark"] .oa-scope .sd-pay.part { border-color: #483e6c; }
-:root[data-theme="dark"] .oa-scope .sd-due.now { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .sd-stat.warn b { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .sd-collect.cod { background: #432f18; color: #eebf94; }
-:root[data-theme="dark"] .oa-scope .sd-collect.paid { background: #23372f; }
-:root[data-theme="dark"] .oa-scope .sd-yn button.on.no { color: #f0cd92; }
-:root[data-theme="dark"] .oa-scope .sd-preview { background: #243a2c; color: #b3d9c7; }
-:root[data-theme="dark"] .oa-scope .dq-load .un { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .sd-card .sd-foot.warn { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .sd-collect-tag { color: #eebf94; background: #432f18; }
-:root[data-theme="dark"] .oa-scope .sd-assign.none { background: #432f18; color: #eebf94; border-color: #795e42; }
-:root[data-theme="dark"] .oa-scope .oa-table th.c { background: #213340; color: #91d0f0; }
-:root[data-theme="dark"] .oa-scope .oa-table th.s { background: #46361c; color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .tp-attn div { background: #43361c; border: 1px solid #7b6a3f; color: #eed097; }
-:root[data-theme="dark"] .oa-scope .tp-attn div.bad { background: #3d1e1c; border-color: #70413c; }
-:root[data-theme="dark"] .oa-scope .tp-line:hover { background: #2c2f26; }
-:root[data-theme="dark"] .oa-scope .tp-role.confirmation { color: #9bd3dd; }
-:root[data-theme="dark"] .oa-scope .tp-role.packing { color: #9ea7d5; }
-:root[data-theme="dark"] .oa-scope .tp-detail { background: #2e2e24; }
-:root[data-theme="dark"] .oa-scope .cs-tag { background: #2a2d33; }
-:root[data-theme="dark"] .oa-scope .cs-tag.good { background: #253d32; }
-:root[data-theme="dark"] .oa-scope .cs-tag.warn { background: #4a3819; color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .cs-tag.violet { background: #29223b; }
-:root[data-theme="dark"] .oa-scope .sd-choice.picked { background: #26292f; }
-:root[data-theme="dark"] .oa-scope .cs-weights div { background: #26292f; }
-:root[data-theme="dark"] .oa-scope .tp-grade { background: #2a2d33; }
-:root[data-theme="dark"] .oa-scope .tp-grade.excellent { background: #263f31; color: #9ee5cf; }
-:root[data-theme="dark"] .oa-scope .tp-grade.good { background: #334026; color: #cae59e; }
-:root[data-theme="dark"] .oa-scope .tp-grade.fair { background: #4a3819; color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .tp-scorebar .track { background: #323630; }
-:root[data-theme="dark"] .oa-scope .warn-text { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .role-checks .role-admin { border-top: 1px solid var(--line, #4f4f4f); }
-:root[data-theme="dark"] .oa-scope .sd-card .sd-id .link { color: var(--accent, #85a9e9); background: var(--accent-soft, #182741); }
-:root[data-theme="dark"] .oa-scope .fn-total td { background: #2c3128; }
-:root[data-theme="dark"] .oa-scope .dq-hold { color: #f0cb90; }
-:root[data-theme="dark"] .oa-scope .dq-card.held { background: #423213; }
+.oa-scope[data-oa-theme="dark"] .banner.warn { background: #43361c; border-color: #7b6a3f; color: #eed097; }
+.oa-scope[data-oa-theme="dark"] .banner.err { background: #3d1e1c; border-color: #70413c; }
+.oa-scope[data-oa-theme="dark"] .chip.good { background: #283e38; }
+.oa-scope[data-oa-theme="dark"] .chip.bad { background: #42211e; }
+.oa-scope[data-oa-theme="dark"] th { background: #2c2f26; }
+.oa-scope[data-oa-theme="dark"] tr.click:hover td { background: #2c2f26; }
+.oa-scope[data-oa-theme="dark"] .tag.Delivered { background: #283e38; }
+.oa-scope[data-oa-theme="dark"] .tag.RTO, .oa-scope[data-oa-theme="dark"] .tag.Cancelled { background: #42211e; }
+.oa-scope[data-oa-theme="dark"] .tag.In { background: #23283c; color: #9ea7d5; }
+.oa-scope[data-oa-theme="dark"] .tag.Pending { background: #4a3c1c; color: #eccd96; }
+.oa-scope[data-oa-theme="dark"] .sd-pay.cod { border-color: #795e42; color: #ebbc93; background: #432f18; }
+.oa-scope[data-oa-theme="dark"] .sd-pay.paid { border-color: #4d6c61; background: #23372f; }
+.oa-scope[data-oa-theme="dark"] .sd-pay.part { border-color: #483e6c; }
+.oa-scope[data-oa-theme="dark"] .sd-due.now { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .sd-stat.warn b { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .sd-collect.cod { background: #432f18; color: #eebf94; }
+.oa-scope[data-oa-theme="dark"] .sd-collect.paid { background: #23372f; }
+.oa-scope[data-oa-theme="dark"] .sd-yn button.on.no { color: #f0cd92; }
+.oa-scope[data-oa-theme="dark"] .sd-preview { background: #243a2c; color: #b3d9c7; }
+.oa-scope[data-oa-theme="dark"] .dq-load .un { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .sd-card .sd-foot.warn { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .sd-collect-tag { color: #eebf94; background: #432f18; }
+.oa-scope[data-oa-theme="dark"] .sd-assign.none { background: #432f18; color: #eebf94; border-color: #795e42; }
+.oa-scope[data-oa-theme="dark"] .oa-table th.c { background: #213340; color: #91d0f0; }
+.oa-scope[data-oa-theme="dark"] .oa-table th.s { background: #46361c; color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .tp-attn div { background: #43361c; border: 1px solid #7b6a3f; color: #eed097; }
+.oa-scope[data-oa-theme="dark"] .tp-attn div.bad { background: #3d1e1c; border-color: #70413c; }
+.oa-scope[data-oa-theme="dark"] .tp-line:hover { background: #2c2f26; }
+.oa-scope[data-oa-theme="dark"] .tp-role.confirmation { color: #9bd3dd; }
+.oa-scope[data-oa-theme="dark"] .tp-role.packing { color: #9ea7d5; }
+.oa-scope[data-oa-theme="dark"] .tp-detail { background: #2e2e24; }
+.oa-scope[data-oa-theme="dark"] .cs-tag { background: #2a2d33; }
+.oa-scope[data-oa-theme="dark"] .cs-tag.good { background: #253d32; }
+.oa-scope[data-oa-theme="dark"] .cs-tag.warn { background: #4a3819; color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .cs-tag.violet { background: #29223b; }
+.oa-scope[data-oa-theme="dark"] .sd-choice.picked { background: #26292f; }
+.oa-scope[data-oa-theme="dark"] .cs-weights div { background: #26292f; }
+.oa-scope[data-oa-theme="dark"] .tp-grade { background: #2a2d33; }
+.oa-scope[data-oa-theme="dark"] .tp-grade.excellent { background: #263f31; color: #9ee5cf; }
+.oa-scope[data-oa-theme="dark"] .tp-grade.good { background: #334026; color: #cae59e; }
+.oa-scope[data-oa-theme="dark"] .tp-grade.fair { background: #4a3819; color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .tp-scorebar .track { background: #323630; }
+.oa-scope[data-oa-theme="dark"] .warn-text { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .role-checks .role-admin { border-top: 1px solid var(--line, #4f4f4f); }
+.oa-scope[data-oa-theme="dark"] .sd-card .sd-id .link { color: var(--accent, #85a9e9); background: var(--accent-soft, #182741); }
+.oa-scope[data-oa-theme="dark"] .fn-total td { background: #2c3128; }
+.oa-scope[data-oa-theme="dark"] .dq-hold { color: #f0cb90; }
+.oa-scope[data-oa-theme="dark"] .dq-card.held { background: #423213; }
