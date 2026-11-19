@@ -9,10 +9,13 @@ import SearchInput from "../components/SearchInput.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { avatarStyleFromString, initials } from "../utils/colorFromString.js";
 
-const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [] };
+const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [], emiRole: "CRM", emiCanVerify: false };
 
-const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio" };
-const APPS = ["reminder", "workshop", "tickets", "orders", "certificates"];
+const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" };
+const APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
+// EMI Manager roles. Admins are EMI admins automatically.
+const EMI_ROLES = ["Manager", "CRM", "Viewer"];
+const EMI_ROLE_HINT = { Manager: "Settings, imports, discounts, collections team", CRM: "Enrols students, records payments, logs calls", Viewer: "Read-only (can be allowed to verify payments)" };
 // Order Analytics desk teams: Confirmation calls and confirms new orders, Dispatch slips / packs / hands over.
 const TEAM_LABEL = { confirmation: "Confirmation", packing: "Dispatch" };
 const TEAMS = ["confirmation", "packing"];
@@ -48,7 +51,7 @@ export default function Users() {
       return;
     }
     try {
-      await api.createUser(form);
+      await api.createUser({ ...form, emiRole: form.apps.includes("emi") ? form.emiRole : undefined });
       setForm(empty);
       load();
       toast(`Added ${form.name} as ${form.role}`, "good");
@@ -95,11 +98,25 @@ export default function Users() {
     // Order Analytics needs a desk team. Switching it on starts with Confirmation (adjust with the team chips that appear).
     const body = { apps: next };
     if (app === "orders" && !has && !(u.ordersRoles || []).length) body.ordersRoles = ["confirmation"];
+    if (app === "emi" && !has && !u.emiRole) body.emiRole = "CRM";
     setBusyId(u._id);
     try {
       const updated = await api.updateUser(u._id, body);
       setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
       toast(`${u.name}: ${APP_LABEL[app]} access ${has ? "removed" : "added"}`, "good");
+    } catch (err) {
+      toast(err.message, "bad");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const setEmi = async (u, patch) => {
+    setBusyId(u._id);
+    try {
+      const updated = await api.updateUser(u._id, patch);
+      setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
+      toast(`${u.name}: EMI Manager updated`, "good");
     } catch (err) {
       toast(err.message, "bad");
     } finally {
@@ -233,6 +250,16 @@ export default function Users() {
             /> {TEAM_LABEL[t]} desk
           </label>
         ))}
+        {form.role !== "admin" && form.apps.includes("emi") && (
+          <>
+            <select value={form.emiRole} onChange={(e) => setForm({ ...form, emiRole: e.target.value })} title="Role inside EMI Manager">
+              {EMI_ROLES.map((r) => <option key={r} value={r}>EMI: {r}</option>)}
+            </select>
+            <label className="ws-inline-check" title="Accounts: may mark payments as verified in EMI Manager">
+              <input type="checkbox" checked={form.emiCanVerify} onChange={(e) => setForm({ ...form, emiCanVerify: e.target.checked })} /> Verifies payments
+            </label>
+          </>
+        )}
         <label className="ws-inline-check" title="Lets this person fill the New Workshop form in Workshop PMS (admins approve)">
           <input type="checkbox" checked={form.canRequestWorkshops} onChange={(e) => setForm({ ...form, canRequestWorkshops: e.target.checked })} /> Workshop coordinator
         </label>
@@ -247,7 +274,7 @@ export default function Users() {
       </p>
 
       <div className="range-pills" role="tablist" aria-label="Filter users by app" style={{ marginBottom: 10 }}>
-        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"], ["certificates", "Certificate Studio users"]].map(([id, label]) => (
+        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"], ["certificates", "Certificate Studio users"], ["emi", "EMI Manager users"]].map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={appTab === id}
             className={"range-pill" + (appTab === id ? " range-pill-active" : "")} onClick={() => setAppTab(id)}>
             {label}{users ? ` (${id === "all" ? users.length : users.filter((u) => u.apps.includes(id)).length})` : ""}
@@ -325,6 +352,17 @@ export default function Users() {
                       </button>
                     );
                   })}
+                  {u.role !== "admin" && u.apps.includes("emi") && (
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span className="muted" style={{ fontSize: 12 }}>EMI role:</span>
+                      <select value={u.emiRole || "CRM"} disabled={busyId === u._id} onChange={(e) => setEmi(u, { emiRole: e.target.value })} title={EMI_ROLE_HINT[u.emiRole || "CRM"]}>
+                        {EMI_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      <label className="ws-inline-check" title="Accounts: may mark payments as verified">
+                        <input type="checkbox" checked={!!u.emiCanVerify} disabled={busyId === u._id} onChange={(e) => setEmi(u, { emiCanVerify: e.target.checked })} /> Verifies
+                      </label>
+                    </div>
+                  )}
                   {u.role !== "admin" && u.apps.includes("orders") && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       <span className="muted" style={{ fontSize: 12 }}>Order desk:</span>

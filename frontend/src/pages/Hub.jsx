@@ -11,6 +11,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
 import { api as ordersApi } from "../orders/api.js";
 import { certApi } from "../certificates/api.js";
+import { api as emiApi } from "../emi/api.js";
+import EmiLogo from "../components/EmiLogo.jsx";
 import "./hub.css";
 
 const greeting = () => {
@@ -19,13 +21,14 @@ const greeting = () => {
 };
 
 export default function Hub() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates } = useAuth();
+  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi } = useAuth();
   const navigate = useNavigate();
   const [wsStats, setWsStats] = useState(null);
   const [remStats, setRemStats] = useState(null);
   const [tkCount, setTkCount] = useState(null);
   const [orderCount, setOrderCount] = useState(null);
   const [certSummary, setCertSummary] = useState(null);
+  const [emiPulse, setEmiPulse] = useState(null);
 
   // Light "what's waiting for you" numbers on each card. Failures are silent —
   // the chooser must always open, even if a stat can't load.
@@ -35,6 +38,7 @@ export default function Hub() {
     if (hasTickets) api.getTicketCount().then(setTkCount).catch(() => {});
     if (hasOrders) ordersApi.get("/desk/counts").then(setOrderCount).catch(() => {});
     if (hasCertificates) certApi.summary().then(setCertSummary).catch(() => {});
+    if (hasEmi) emiApi.get("/pulse").then(setEmiPulse).catch(() => {});
   }, []);
 
   const open = (to) => {
@@ -166,6 +170,26 @@ export default function Hub() {
               {!isAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} of your requests pending</span>}
               {certSummary && !(certSummary.pending > 0) && <span className="hub-pill">{certSummary.issuedThisMonth} issued this month</span>}
               {!certSummary && <span className="hub-pill hub-pill-quiet">Open</span>}
+            </div>
+          </button>}
+          {hasEmi && <button type="button" className="hub-card hub-card-emi" onClick={() => open("/emi")}>
+            <div className="hub-card-head">
+              <EmiLogo size={54} />
+              <span className="hub-card-arrow" aria-hidden="true">→</span>
+            </div>
+            <h2>EMI Manager</h2>
+            <p>Fees, EMI schedules and payments for every SUPER and RGM student, by program and batch, with reminders and payment verification.</p>
+            <ul className="hub-card-points">
+              <li>EMI tracker · overdue and due today at a glance</li>
+              <li>Record payments with proof, receipts and audit trail</li>
+              <li>Collections performance and Google Sheet backups</li>
+            </ul>
+            <div className="hub-card-foot">
+              {emiPulse?.overdue > 0 && <span className="hub-pill hub-pill-alert">{emiPulse.overdue} overdue</span>}
+              {emiPulse?.due_today > 0 && <span className="hub-pill">{emiPulse.due_today} due today</span>}
+              {emiPulse?.unverified > 0 && <span className="hub-pill">{emiPulse.unverified} to verify</span>}
+              {emiPulse && !(emiPulse.overdue > 0) && !(emiPulse.due_today > 0) && !(emiPulse.unverified > 0) && <span className="hub-pill">All caught up</span>}
+              {!emiPulse && <span className="hub-pill hub-pill-quiet">Open</span>}
             </div>
           </button>}
         </div>

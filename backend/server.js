@@ -22,7 +22,9 @@ import ticketRoutes from "./routes/tickets.js";
 import slackRoutes from "./routes/slack.js";
 import orders from "./orders/index.js";
 import certificates from "./certificates/index.js";
+import emi from "./emi/index.js";
 import { syncOrdersTeam } from "./utils/ordersTeam.js";
+import { syncEmiTeam } from "./utils/emiTeam.js";
 import { runTicketReminders, inReminderWindow } from "./utils/ticketReminders.js";
 import { getSettings } from "./models/Settings.js";
 import { sendDailyReminders } from "./utils/sendDailyReminders.js";
@@ -125,7 +127,9 @@ app.use(cors(corsOptions)); // also answers OPTIONS preflight
 app.use("/api/slack", slackRoutes);
 // Proof screenshots arrive as (client-resized) data URLs, so allow more than the 100kb default.
 // The raw body is kept for the Shopify webhook only: its signature is computed over the exact bytes.
-app.use(express.json({ limit: "3mb", verify: (req, res, buf) => { if (req.originalUrl.startsWith("/api/orders/webhook/shopify")) req.rawBody = buf; } }));
+const jsonBody = express.json({ limit: "3mb", verify: (req, res, buf) => { if (req.originalUrl.startsWith("/api/orders/webhook/shopify")) req.rawBody = buf; } });
+// EMI Manager's bulk student import posts a big JSON body, so it gets a roomier limit (and only after sign-in, see its mount below).
+app.use((req, res, next) => (req.originalUrl.startsWith("/api/emi") ? next() : jsonBody(req, res, next)));
 // Gzip every response — the Master and Submission Log pages return
 // hundreds-to-thousands of JSON rows and the CSV exports are much larger
 // still; compressing those cuts transfer time noticeably, especially for
@@ -179,6 +183,10 @@ app.use("/api/orders", requireAuth, requireApp("orders"), orders.router);
 // Uses the hub's login. Hub admins are Certificate Studio admins (templates, team-wide edits, change-request approvals);
 // everyone else who was given the app is a coordinator (issue + download certificates, request changes).
 app.use("/api/certificates", requireAuth, requireApp("certificates"), certificates.router);
+// EMI Manager — the 6th app, living in ./emi (fee + EMI tracking for the high-ticket programs). Uses the hub's login; its data is on its OWN
+// connection (EMI_MONGO_URI, or the EMI_DB_NAME database on the hub's cluster) in the emi_* collections. Hub admins are EMI admins; everyone
+// else has the EMI role picked on the Users page (Manager / CRM / Viewer).
+app.use("/api/emi", requireAuth, requireApp("emi"), express.json({ limit: "10mb" }), emi.router);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/reminder_list";
@@ -266,6 +274,10 @@ mongoose
     certificates.checkImages();
     syncOrdersTeam({ delayMs: 3_000 });
     if (process.env.ORDERS_SYNC !== "0") orders.start();
+    // EMI Manager: mirror who may use it, then make sure its indexes exist and start its Google Sheet backup scheduler.
+    // EMI_SYNC=0 switches the scheduler off on a second instance.
+    syncEmiTeam({ delayMs: 4_000 });
+    if (process.env.EMI_SYNC !== "0") emi.start();
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err.message);

@@ -4,6 +4,7 @@ import WorkshopLogo from "./WorkshopLogo.jsx";
 import TicketsLogo from "./TicketsLogo.jsx";
 import OrdersLogo from "./OrdersLogo.jsx";
 import CertificatesLogo from "./CertificatesLogo.jsx";
+import EmiLogo from "./EmiLogo.jsx";
 import OfflineScreen from "./OfflineScreen.jsx";
 import { useNetwork } from "../context/NetworkContext.jsx";
 
@@ -22,6 +23,7 @@ const APPS = {
   tickets: { Mark: TicketsLogo, name: "Help Tickets", cls: "ls-tickets" },
   orders: { Mark: OrdersLogo, name: "Order Analytics", cls: "ls-orders" },
   certificates: { Mark: CertificatesLogo, name: "Certificate Studio", cls: "ls-certificates" },
+  emi: { Mark: EmiLogo, name: "EMI Manager", cls: "ls-emi" },
 };
 
 const STEPS = ["Getting things ready", "Checking your session", "Loading your workspace", "Almost there"];

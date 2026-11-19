@@ -2,15 +2,16 @@ import express from "express";
 import User from "../models/User.js";
 import { hashPassword } from "../utils/auth.js";
 import { clearAuthCache } from "../middleware/auth.js";
-import { appsOf, cleanApps, cleanOrdersRoles, ordersRolesOf } from "../utils/access.js";
+import { appsOf, cleanApps, cleanOrdersRoles, cleanEmiRole, ordersRolesOf } from "../utils/access.js";
 import { syncOrdersTeam } from "../utils/ordersTeam.js";
+import { syncEmiTeam } from "../utils/emiTeam.js";
 
 // Attach the effective app list so the Users page shows legacy accounts
 // (no stored value) as having both apps.
 const withApps = (u) => {
   const o = u.toObject ? u.toObject() : u;
   delete o.passwordHash;
-  return { ...o, apps: appsOf(o), ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [] };
+  return { ...o, apps: appsOf(o), ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [], emiRole: o.role === "admin" ? "Admin" : cleanEmiRole(o.emiRole) || null, emiCanVerify: !!o.emiCanVerify };
 };
 
 const router = express.Router();
@@ -24,11 +25,12 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles } = req.body;
+    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify } = req.body;
     const cleaned = cleanApps(apps);
     const teams = cleanOrdersRoles(ordersRoles) || [];
     if (cleaned && cleaned.length === 0 && role !== "admin") return res.status(400).json({ error: "Pick at least one app" });
     if (role !== "admin" && cleaned?.includes("orders") && teams.length === 0) return res.status(400).json({ error: "Order Analytics needs a desk team: pick Confirmation and/or Dispatch" });
+    if (role !== "admin" && cleaned?.includes("emi") && !cleanEmiRole(emiRole)) return res.status(400).json({ error: "EMI Manager needs a role: pick Manager, CRM or Viewer" });
     if (!name || !email || !password) return res.status(400).json({ error: "Name, email, and password required" });
     if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
 
@@ -42,9 +44,12 @@ router.post("/", async (req, res) => {
       canRequestWorkshops: !!canRequestWorkshops,
       ...(cleaned ? { apps: cleaned } : {}),
       ordersRoles: teams,
+      ...(cleanEmiRole(emiRole) ? { emiRole: cleanEmiRole(emiRole) } : {}),
+      emiCanVerify: !!emiCanVerify,
     });
     clearAuthCache();
     syncOrdersTeam();
+    syncEmiTeam();
     res.status(201).json(withApps(user));
   } catch (err) {
     res.status(400).json({ error: err.code === 11000 ? "That email is already registered" : err.message });
@@ -56,9 +61,9 @@ router.post("/", async (req, res) => {
 // field.
 router.put("/:id", async (req, res) => {
   try {
-    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles } = req.body;
+    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify } = req.body;
     const updates = {};
-    const current = apps !== undefined || ordersRoles !== undefined || role !== undefined ? await User.findById(req.params.id).lean() : null;
+    const current = apps !== undefined || ordersRoles !== undefined || emiRole !== undefined || role !== undefined ? await User.findById(req.params.id).lean() : null;
     if (apps !== undefined) {
       const cleaned = cleanApps(apps);
       if (!cleaned || cleaned.length === 0) return res.status(400).json({ error: "Pick at least one app" });
@@ -72,6 +77,17 @@ router.put("/:id", async (req, res) => {
       const nextTeams = updates.ordersRoles !== undefined ? updates.ordersRoles : cleanOrdersRoles(current?.ordersRoles) || [];
       if (nextRole !== "admin" && nextApps.includes("orders") && nextTeams.length === 0) {
         return res.status(400).json({ error: "Order Analytics needs a desk team: pick Confirmation and/or Dispatch" });
+      }
+    }
+    if (emiRole !== undefined) { const r = cleanEmiRole(emiRole); if (r) updates.emiRole = r; }
+    if (emiCanVerify !== undefined) updates.emiCanVerify = !!emiCanVerify;
+    // Whatever the account will look like after this save: EMI Manager needs a role (admins are EMI admins and need none).
+    {
+      const nextRole = role !== undefined ? (role === "admin" ? "admin" : "member") : current?.role;
+      const nextApps = updates.apps || (Array.isArray(current?.apps) ? current.apps : []);
+      const nextEmiRole = updates.emiRole || cleanEmiRole(current?.emiRole);
+      if (nextRole !== "admin" && nextApps.includes("emi") && !nextEmiRole) {
+        return res.status(400).json({ error: "EMI Manager needs a role: pick Manager, CRM or Viewer" });
       }
     }
     if (name !== undefined) updates.name = name;
@@ -104,6 +120,7 @@ router.put("/:id", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     clearAuthCache();
     syncOrdersTeam();
+    syncEmiTeam();
     res.json(withApps(user));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -127,6 +144,7 @@ router.delete("/:id", async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
   clearAuthCache();
   syncOrdersTeam();
+  syncEmiTeam();
   res.json({ ok: true });
 });
 
