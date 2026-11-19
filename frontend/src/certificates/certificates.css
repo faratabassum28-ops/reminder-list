@@ -173,3 +173,8 @@
 /* the sidebar header is narrow: let the name wrap onto two lines instead of being clipped */
 .cs-scope .brand-title { white-space: normal; line-height: 1.15; }
 .cs-scope .brand-sub { display: none; }
+
+/* sidebar: keep items readable, scroll the picker, pin "All apps" */
+.cs-scope .sidebar nav > * { flex-shrink: 0; }
+.cs-side-list { max-height: 38vh; overflow-y: auto; }
+.cs-scope .nav-link.cs-switch { margin-top: 0; flex-shrink: 0; border-radius: 8px; }

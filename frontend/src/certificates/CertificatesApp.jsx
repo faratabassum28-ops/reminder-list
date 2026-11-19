@@ -139,15 +139,16 @@ function Shell() {
             </div>
           )}
 
-          {(hasReminder || hasWorkshop || hasTickets || hasOrders || hasEmi) && (
-            <button type="button" className="nav-link cs-switch" onClick={backToHub} title="Switch app">
-              <span className="nav-icon-wrap">
-                <svg className="nav-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
-              </span>
-              {!collapsed && <span>All apps</span>}
-            </button>
-          )}
         </nav>
+
+        {(hasReminder || hasWorkshop || hasTickets || hasOrders || hasEmi) && (
+          <button type="button" className="nav-link cs-switch" onClick={backToHub} title="Switch app">
+            <span className="nav-icon-wrap">
+              <svg className="nav-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+            </span>
+            {!collapsed && <span>All apps</span>}
+          </button>
+        )}
 
         <div className="sidebar-user">
           <NavLink to={`${C}/account`} className="sidebar-user-link" onClick={close} title={collapsed ? user.name : undefined}>
