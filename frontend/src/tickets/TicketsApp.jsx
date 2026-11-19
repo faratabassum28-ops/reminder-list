@@ -26,7 +26,7 @@ const I = {
 // doer; the server only shows a ticket to its assignee, its raiser, and
 // admins (see backend/routes/tickets.js).
 export default function TicketsApp() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasOrders, hasCertificates } = useAuth();
+  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasOrders, hasCertificates, hasEmi } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("tk-sidebar-collapsed") === "1");
@@ -98,7 +98,7 @@ export default function TicketsApp() {
               {l.badge > 0 && !collapsed && <span className="nav-badge">{l.badge > 9 ? "9+" : l.badge}</span>}
             </NavLink>
           ))}
-          {(hasReminder || hasWorkshop || hasOrders || hasCertificates) && (
+          {(hasReminder || hasWorkshop || hasOrders || hasCertificates || hasEmi) && (
             <button type="button" className="nav-link tk-switch" onClick={backToHub} title="Switch app">
               <span className="nav-icon-wrap">
                 <svg className="nav-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

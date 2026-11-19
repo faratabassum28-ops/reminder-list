@@ -1,8 +1,8 @@
 // Which apps a user may open. Admins always get every app; legacy accounts with no `apps` value keep the
-// first three so nothing breaks for existing people. Order Analytics ("orders") and Certificate Studio
-// ("certificates") are NEVER implied: a non-admin only has them when an admin ticked them on the Users page
+// first three so nothing breaks for existing people. Order Analytics ("orders"), Certificate Studio
+// ("certificates") and EMI Manager ("emi") are NEVER implied: a non-admin only has them when an admin ticked them on the Users page
 // (Order Analytics also needs a desk team).
-export const ALL_APPS = ["reminder", "workshop", "tickets", "orders", "certificates"];
+export const ALL_APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
 const LEGACY_APPS = ["reminder", "workshop", "tickets"];
 
 // The desk teams inside Order Analytics. Admins see everything there; everyone else needs one or both.
@@ -31,3 +31,7 @@ export function cleanOrdersRoles(input) {
 
 // What Order Analytics needs to know about a person (admins are covered by role, so no teams are listed for them).
 export const ordersRolesOf = (user) => (user?.role === "admin" ? [] : cleanOrdersRoles(user?.ordersRoles) || []);
+
+// EMI Manager roles (admins are always "Admin" inside it).
+export const EMI_ROLES = ["Admin", "Manager", "CRM", "Viewer"];
+export const cleanEmiRole = (input) => (EMI_ROLES.includes(input) ? input : undefined);

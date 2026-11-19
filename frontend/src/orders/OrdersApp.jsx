@@ -122,7 +122,7 @@ function SyncNote() {
 }
 
 function Shell({ user }) {
-  const { logout, hasReminder, hasWorkshop, hasTickets, hasCertificates } = useAuth();
+  const { logout, hasReminder, hasWorkshop, hasTickets, hasCertificates, hasEmi } = useAuth();
   const navigate = useNavigate();
   // The menu folds away as soon as you pick something, to give the page the whole screen; the ☰ button brings it back.
   const [collapsed, setCollapsed] = useState(false);
@@ -135,7 +135,7 @@ function Shell({ user }) {
   const ok = (key) => !allowed || allowed.includes(key);
   const guard = (key, el) => (ok(key) ? el : <Navigate to={O} replace />);
   const nav = NAV.filter(([, , key]) => ok(key)).map(([to, label, key, kind]) => [key === "desk" ? deskHome(user) : O + to, label, key, kind]);
-  const switchApp = hasReminder || hasWorkshop || hasTickets || hasCertificates;
+  const switchApp = hasReminder || hasWorkshop || hasTickets || hasCertificates || hasEmi;
   const roleText = isAdmin(user) ? "Admin" : rolesOf(user).map((r) => ROLE_LABEL[r].replace(" team", "")).join(" + ");
   const toApps = (e) => { e.preventDefault(); sessionStorage.removeItem("hubChosen"); navigate("/hub"); };
 

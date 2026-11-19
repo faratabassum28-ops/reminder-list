@@ -234,3 +234,6 @@ A separate third app (next to Reminder List and Workshop PMS) that replaces the 
 - Form fields: Raised By, PC Accountable (Dolly / Paridhi — change with `TICKET_PC_NAMES=Dolly,Paridhi` in the backend env), Issue, Assigned To, Planned Date + Time of Resolution.
 - **Calendar filter** on both pages, same as Master: quick pills (Today / Tomorrow / Last Week / Next Week) or a From/To date picker, with a *Filter by* switch for **Date raised** or **Planned resolution**. The status counts update with it.
 - The assignee also gets an email when SMTP is configured (best effort; the ticket is created either way).
+
+## Apps
+Six apps share this login: Reminder List, Workshop PMS, Help Tickets, Order Analytics, Certificate Studio and **EMI Manager** — see [EMI-INTEGRATION.md](EMI-INTEGRATION.md).

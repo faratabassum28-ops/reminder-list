@@ -21,10 +21,10 @@ function readCachedUser() {
 // Which apps this account can open. Older cached sessions have no `apps`
 // value, so they keep the first three until /auth/me refreshes them. Admins
 // get every app, including Order Analytics ("orders") and Certificate Studio
-// ("certificates"), which a non-admin only has when an admin switched them on.
+// ("certificates") and EMI Manager ("emi"), which a non-admin only has when an admin switched them on.
 function userApps(user) {
   if (!user) return [];
-  if (user.role === "admin") return ["reminder", "workshop", "tickets", "orders", "certificates"];
+  if (user.role === "admin") return ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
   if (!Array.isArray(user.apps)) return ["reminder", "workshop", "tickets"];
   return user.apps;
 }
@@ -123,7 +123,7 @@ export function AuthProvider({ children }) {
     });
 
   return (
-    <AuthContext.Provider value={{ user, loading, slow, login, logout, updateProfile, isAdmin: user?.role === "admin", hasReminder: userApps(user).includes("reminder"), hasWorkshop: userApps(user).includes("workshop"), hasTickets: userApps(user).includes("tickets"), hasOrders: userApps(user).includes("orders"), hasCertificates: userApps(user).includes("certificates"), canRequestWorkshops: user?.role === "admin" || user?.canRequestWorkshops === true }}>
+    <AuthContext.Provider value={{ user, loading, slow, login, logout, updateProfile, isAdmin: user?.role === "admin", hasReminder: userApps(user).includes("reminder"), hasWorkshop: userApps(user).includes("workshop"), hasTickets: userApps(user).includes("tickets"), hasOrders: userApps(user).includes("orders"), hasCertificates: userApps(user).includes("certificates"), hasEmi: userApps(user).includes("emi"), canRequestWorkshops: user?.role === "admin" || user?.canRequestWorkshops === true }}>
       {children}
     </AuthContext.Provider>
   );

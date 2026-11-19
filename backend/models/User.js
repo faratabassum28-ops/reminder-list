@@ -29,14 +29,19 @@ const userSchema = new mongoose.Schema(
     canRequestWorkshops: { type: Boolean, default: false },
     // Which apps this account may open: "reminder" (Reminder List) and/or
     // "workshop" (Workshop PMS) and/or "tickets" (Help Tickets) and/or "orders" (Order Analytics)
-    // and/or "certificates" (Certificate Studio). Accounts created before this field existed
+    // and/or "certificates" (Certificate Studio) and/or "emi" (EMI Manager). Accounts created before this field existed
     // have no value and are treated as having the first three (see utils/access.js), so
     // nothing changes for existing people. Admins always get both.
-    apps: { type: [String], enum: ["reminder", "workshop", "tickets", "orders", "certificates"], default: undefined },
+    apps: { type: [String], enum: ["reminder", "workshop", "tickets", "orders", "certificates", "emi"], default: undefined },
     // Order Analytics ("orders" app): which desk team(s) this person works in. Admins see the whole dashboard and
     // need none. Everyone else needs at least one: "confirmation" (calls and confirms new orders) and/or
     // "packing" (the dispatch desk: slips, packing, handover).
     ordersRoles: { type: [String], enum: ["confirmation", "packing"], default: [] },
+    // EMI Manager ("emi" app): the role inside it. Admins are EMI admins and need none. "Admin" = everything incl. users' batch
+    // access and backups, "Manager" = settings, imports, discounts above the limit; "CRM" = enrol, record payments, log calls;
+    // "Viewer" = read-only (Accounts can additionally be allowed to verify payments with emiCanVerify).
+    emiRole: { type: String, enum: ["Admin", "Manager", "CRM", "Viewer"], default: undefined },
+    emiCanVerify: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

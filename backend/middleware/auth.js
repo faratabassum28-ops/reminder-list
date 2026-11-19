@@ -52,13 +52,13 @@ export function requireAdmin(req, res, next) {
 }
 
 // Stacks after requireAuth — blocks accounts that weren't given this app
-// ("reminder" = Reminder List, "workshop" = Workshop PMS, "tickets", "orders", "certificates"). Enforced on the
+// ("reminder" = Reminder List, "workshop" = Workshop PMS, "tickets", "orders", "certificates", "emi"). Enforced on the
 // server so a workshop-only user can't reach reminder data by calling the
 // API directly, and vice versa.
 export function requireApp(app) {
   return (req, res, next) => {
     if (!hasApp(req.user, app)) {
-      return res.status(403).json({ error: `Your account doesn't have access to ${{ workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio" }[app] || "the Reminder List"}` });
+      return res.status(403).json({ error: `Your account doesn't have access to ${{ workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" }[app] || "the Reminder List"}` });
     }
     next();
   };

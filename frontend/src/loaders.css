@@ -28,6 +28,7 @@
 .ls-tickets  { --ls-a: #35c4cf; --ls-b: #0e8a96; }
 .ls-orders   { --ls-a: #3fc58d; --ls-b: #13694b; }
 .ls-certificates { --ls-a: #e5628f; --ls-b: #9d1f4b; }
+.ls-emi { --ls-a: #6d8cf0; --ls-b: #2c3f9e; }
 .ls > :not(.ls-aurora), .off > :not(.ls-aurora) { position: relative; z-index: 1; }
 
 .ls-aurora { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }

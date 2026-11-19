@@ -16,6 +16,7 @@ const Hub = lazyRetry(() => import("./pages/Hub.jsx"));
 const WorkshopApp = lazyRetry(() => import("./workshops/WorkshopApp.jsx"));
 const OrdersApp = lazyRetry(() => import("./orders/OrdersApp.jsx"));
 const CertificatesApp = lazyRetry(() => import("./certificates/CertificatesApp.jsx"));
+const EmiApp = lazyRetry(() => import("./emi/EmiApp.jsx"));
 import Login from "./pages/Login.jsx";
 import ShortcutsHelp from "./components/ShortcutsHelp.jsx";
 import Logo from "./components/Logo.jsx";
@@ -78,7 +79,7 @@ const prefetchPages = () => {
 };
 
 export default function App() {
-  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, canRequestWorkshops } = useAuth();
+  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi, canRequestWorkshops } = useAuth();
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -122,18 +123,19 @@ export default function App() {
   if (!user) return <Login />;
 
   // Separate access per app: Reminder List, Workshop PMS, Help Tickets,
-  // Order Analytics and Certificate Studio are five independent apps. A person only ever sees the ones their
+  // Order Analytics, Certificate Studio and EMI Manager are six independent apps. A person only ever sees the ones their
   // account was given; someone with a single app goes straight into it and
   // never sees the chooser, everyone else picks from the chooser (/hub).
-  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets, orders: hasOrders, certificates: hasCertificates };
+  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets, orders: hasOrders, certificates: hasCertificates, emi: hasEmi };
   const appCount = Object.values(apps).filter(Boolean).length;
   const onlyApp = appCount === 1 ? Object.keys(apps).find((k) => apps[k]) : null;
-  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets", orders: "/orders", certificates: "/certificates" };
+  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets", orders: "/orders", certificates: "/certificates", emi: "/emi" };
   const inWorkshops = pathname === "/workshops" || pathname.startsWith("/workshops/");
   const inTickets = pathname === "/tickets" || pathname.startsWith("/tickets/");
   const inOrders = pathname === "/orders" || pathname.startsWith("/orders/");
   const inCertificates = pathname === "/certificates" || pathname.startsWith("/certificates/");
-  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : inCertificates ? "certificates" : "reminder";
+  const inEmi = pathname === "/emi" || pathname.startsWith("/emi/");
+  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : inCertificates ? "certificates" : inEmi ? "emi" : "reminder";
 
   if (appCount === 0) {
     return (
@@ -192,6 +194,15 @@ export default function App() {
       <Suspense fallback={<LoadingScreen app="certificates" message="Opening Certificate Studio" />}>
         <Routes>
           <Route path="/certificates/*" element={<CertificatesApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+  if (inEmi) {
+    return (
+      <Suspense fallback={<LoadingScreen app="emi" message="Opening EMI Manager" />}>
+        <Routes>
+          <Route path="/emi/*" element={<EmiApp />} />
         </Routes>
       </Suspense>
     );
