@@ -2651,3 +2651,5 @@ button:not(.link-btn):not(.collapse-btn):not(.modal-x):not(.btn-ghost):not(.btn-
 .col-note { min-width: 220px; max-width: 280px; }
 .ticket-note-cell textarea { width: 100%; resize: vertical; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel-alt); color: inherit; }
 .ticket-note-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+/* sidebar nav: never squash items when the list is taller than the screen; scroll instead */
+.sidebar nav > * { flex-shrink: 0; }

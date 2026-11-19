@@ -130,8 +130,8 @@ export default function Layout() {
               {can.admin && <Link to="/backup" icon="database" label="Backup & restore"><span className="nav-dot" style={{ color: `var(--${bTone === 'good' ? 'good' : bTone === 'warn' ? 'warn' : 'bad'})` }} /></Link>}
             </>
           )}
-          {otherApps && (<><div className="nav-group">Suite</div><button type="button" className="emi-nav-link" onClick={backToHub} title="Switch app"><Icon name="grid" className="emi-nav-icon" size={18} /><span className="nav-label">All apps</span></button></>)}
         </nav>
+        {otherApps && <div className="emi-switch"><button type="button" className="emi-nav-link" onClick={backToHub} title="Switch app"><Icon name="grid" className="emi-nav-icon" size={18} /><span className="nav-label">All apps</span></button></div>}
         <div className="sidebar-foot">
           {pulse && pulse.promised_today > 0 && <div className="chip-note warn"><Icon name="phone" size={13} /><span>{pulse.promised_today} promised to pay today</span></div>}
           {can.manage && backup && <div className={`chip-note ${bTone}`} title="Backups keep a copy of all data in your Google Sheet"><i /><span>{bText}</span></div>}
