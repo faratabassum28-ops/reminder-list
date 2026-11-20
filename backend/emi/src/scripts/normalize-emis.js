@@ -23,7 +23,7 @@ async function main() {
   const admin = await User.findOne({ role: 'Admin', active: { $ne: false } });
   if (APPLY && !admin) throw new Error('No active EMI admin found to record the change under');
 
-  const rows = [['program', 'batch', 'student', 'phone', 'emis_before', 'paid_or_part_paid', 'result', 'new_emi_count', 'detail']];
+  const rows = [['program', 'batch', 'student', 'phone', 'emis_before', 'paid_or_part_paid', 'result', 'new_emi_count', 'balance_left', 'detail']];
   const tally = { already: 0, fix: 0, manual: 0, failed: 0 };
 
   for (const program of await Program.find({}).lean()) {
@@ -39,13 +39,13 @@ async function main() {
         const base = [program.code, batch.batch_name, student ? student.full_name : '?', student ? student.phone : '', plan.count, plan.locked ?? ''];
         tally[plan.status]++;
         if (plan.status === 'already') continue;
-        if (plan.status === 'manual') { rows.push([...base, 'MANUAL', plan.count, plan.reason]); continue; }
+        if (plan.status === 'manual') { rows.push([...base, 'MANUAL', plan.count, plan.balance_left ?? '', plan.reason]); continue; }
         const detail = plan.emis.map((e) => `${e.amount_due}@${e.due_date}`).join(' | ');
-        if (!APPLY) { rows.push([...base, 'WOULD FIX', fixed, detail]); continue; }
+        if (!APPLY) { rows.push([...base, 'WOULD FIX', fixed, '', detail]); continue; }
         try {
           await money.restructurePlan(admin, enr._id, plan.emis, `Standardised to the ${fixed}-EMI plan used in the PMS (was ${plan.count} EMIs)`);
-          rows.push([...base, 'FIXED', fixed, detail]);
-        } catch (e) { tally.failed++; tally.fix--; rows.push([...base, 'FAILED', plan.count, e.message]); }
+          rows.push([...base, 'FIXED', fixed, '', detail]);
+        } catch (e) { tally.failed++; tally.fix--; rows.push([...base, 'FAILED', plan.count, '', e.message]); }
       }
     }
   }

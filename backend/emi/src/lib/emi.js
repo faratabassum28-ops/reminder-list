@@ -50,7 +50,13 @@ function planFixedEmis(instalments, fixed, touchedIds = new Set()) {
   if (live.length === fixed) return { status: 'already', count: live.length };
   const editable = live.filter((i) => !(i.amount_paid > 0) && !touchedIds.has(String(i.id || i._id)));
   const locked = live.filter((i) => !editable.includes(i));
-  if (!editable.length) return { status: 'manual', count: live.length, reason: `all ${live.length} EMIs are already paid / part-paid (cannot add EMIs to a fully-paid plan)` };
+  const balance_left = sum(live, (i) => Math.max(i.amount_due - (i.amount_paid || 0), 0));
+  if (!editable.length) {
+    const reason = !live.length ? 'no EMIs on this enrolment (nothing to pay) - nothing to change'
+      : balance_left === 0 ? `fully paid in ${live.length} EMIs - nothing to change`
+        : `all ${live.length} EMIs already have a payment but Rs ${balance_left} is still unpaid - REVIEW BY HAND`;
+    return { status: 'manual', count: live.length, balance_left, reason };
+  }
   const need = fixed - locked.length;
   if (need < 1) return { status: 'manual', count: live.length, reason: `${locked.length} EMIs are already paid / part-paid, which leaves no room for a ${fixed}-EMI plan` };
   const pool = sum(editable, (i) => i.amount_due);
