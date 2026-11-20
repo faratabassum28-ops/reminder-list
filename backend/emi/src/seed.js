@@ -20,8 +20,8 @@ async function main() {
   if (!admin && process.argv.includes('--demo')) admin = await User.create({ name: 'Demo admin', email: 'demo-admin@example.invalid', password_hash: await bcrypt.hash('x'.repeat(24), 4), role: 'Admin', active: false });
 
   // Ticket sizes come from the spec; application/commitment defaults are left at 0 (an open question in the spec).
-  for (const p of [{ code: 'SUPER', name: 'SUPER', default_fee: 250000 }, { code: 'RGM', name: 'RGM (Reiki Grand Master L4/L5)', default_fee: 120000 }]) {
-    await Program.updateOne({ code: p.code }, { $setOnInsert: { ...p, max_emis: 12 } }, { upsert: true });
+  for (const p of [{ code: 'SUPER', name: 'SUPER', default_fee: 250000, max_emis: 10, fixed_emis: 10 }, { code: 'RGM', name: 'RGM (Reiki Grand Master L4/L5)', default_fee: 120000 }]) {
+    await Program.updateOne({ code: p.code }, { $setOnInsert: { max_emis: 12, ...p } }, { upsert: true });
   }
   const super_ = await Program.findOne({ code: 'SUPER' });
   // Only Tarot L1 (10,000) and Reiki L1+L2 (6,999) amounts are given in the spec; set the others in Settings.
@@ -51,7 +51,7 @@ async function demo(admin, program) {
   for (const [name, offset, paidCount, partial] of people) {
     const total = 250000, adj = [{ name: 'Tarot L1', amount: 10000 }, { name: 'Reiki L1+L2', amount: 6999 }];
     const fees = E.computeFees({ total_fee: total, adjustments: adj, application_fee: 10000, commitment_fee: 40000 });
-    const emis = E.autoSplit(fees.balance_due, 6, addDays(today, offset));
+    const emis = E.autoSplit(fees.balance_due, E.fixedEmiCount(program) || 6, addDays(today, offset));
     // dates must be ascending and a paid EMI must be in the past for the demo to make sense
     const emi_paid = emis.map((e, i) => (i < paidCount ? e.amount_due : i === paidCount && partial ? partial : 0));
     await money.createEnrollment(admin, {

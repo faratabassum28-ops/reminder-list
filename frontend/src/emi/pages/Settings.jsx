@@ -55,7 +55,7 @@ function ProgramForm({ p, onClose, onDone }) {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     try {
-      const body = { ...f, default_fee: Number(f.default_fee), default_application_fee: Number(f.default_application_fee || 0), default_commitment_fee: Number(f.default_commitment_fee || 0), max_emis: Number(f.max_emis) };
+      const body = { ...f, default_fee: Number(f.default_fee), default_application_fee: Number(f.default_application_fee || 0), default_commitment_fee: Number(f.default_commitment_fee || 0), max_emis: Number(f.max_emis), fixed_emis: f.fixed_emis ? Number(f.fixed_emis) : null };
       if (p._id) await api.put(`/programs/${p._id}`, body); else await api.post('/programs', body);
       onDone();
     } catch (e) { setErr(e.message); }
@@ -66,6 +66,7 @@ function ProgramForm({ p, onClose, onDone }) {
         <Field label="Name" span="all"><input value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label="Default fee (₹)"><input type="number" value={f.default_fee} onChange={(e) => set('default_fee', e.target.value)} /></Field>
         <Field label="Max EMIs"><input type="number" min="1" value={f.max_emis} onChange={(e) => set('max_emis', e.target.value)} /></Field>
+        <Field label="Fixed EMIs" hint="Optional. If set, every student has exactly this many EMIs (SUPER is always 10)"><input type="number" min="1" value={f.fixed_emis || ''} onChange={(e) => set('fixed_emis', e.target.value)} /></Field>
         <Field label="Default application fee (₹)" hint="Optional"><input type="number" value={f.default_application_fee} onChange={(e) => set('default_application_fee', e.target.value)} /></Field>
         <Field label="Default commitment fee (₹)" hint="Optional"><input type="number" value={f.default_commitment_fee} onChange={(e) => set('default_commitment_fee', e.target.value)} /></Field>
       </div>

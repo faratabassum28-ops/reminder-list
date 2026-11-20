@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from '../router';
 import { api } from '../api';
-import { inr, fmtDate, todayIST, autoSplit, useFetch } from '../util';
+import { inr, fmtDate, todayIST, autoSplit, fixedEmis, useFetch } from '../util';
 import { Field, FileInput, Loading, Modal } from '../components/ui';
 
 const STEPS = ['Student', 'Fee & adjustments', 'EMI plan', 'Review & save'];
@@ -77,6 +77,8 @@ export default function NewEnrollment() {
   const diff = balance - planSum;
   const datesOk = emis.every((e, i) => e.due_date && (i === 0 || e.due_date >= emis[i - 1].due_date));
   const maxEmis = program ? program.max_emis : 12;
+  const fixed = fixedEmis(program); // e.g. SUPER: every student has exactly 10 EMIs
+  useEffect(() => { if (fixed) setCount(fixed); }, [fixed]);
   const whole = (v) => Number.isInteger(money(v)) && money(v) >= 0;
 
   const availableTypes = useMemo(() => (types.data || []).filter((t) => t.active && (!t.target_programs.length || t.target_programs.includes(programId))), [types.data, programId]);
@@ -100,6 +102,7 @@ export default function NewEnrollment() {
     }
     if (s === 2) {
       if (!emis.length && balance !== 0) return 'Create the EMI plan (or make the balance zero)';
+      if (fixed && balance > 0 && emis.length !== fixed) return `${program.name} is a ${fixed}-EMI plan: the plan must have exactly ${fixed} EMIs (it has ${emis.length})`;
       if (diff !== 0) return `EMI amounts must add up to ${inr(balance)} (difference ${inr(diff)})`;
       if (emis.some((e) => money(e.amount_due) <= 0)) return 'Every EMI needs an amount above zero';
       if (!datesOk) return 'EMI due dates must be in ascending order';
@@ -109,7 +112,7 @@ export default function NewEnrollment() {
   const next = () => { const e = stepError(step); setErr(e); if (!e) setStep(step + 1); };
 
   const doSplit = () => {
-    const n = Number(count);
+    const n = fixed || Number(count);
     if (!Number.isInteger(n) || n < 1) return setErr('Enter how many EMIs (1 or more)');
     if (n > maxEmis) return setErr(`${program.name} allows at most ${maxEmis} EMIs`);
     setErr('');
@@ -201,11 +204,11 @@ export default function NewEnrollment() {
           {step === 2 && (
             <div className="grid">
               <div className="row">
-                <Field label="Number of EMIs"><input type="number" min="1" max={maxEmis} value={count} onChange={(e) => setCount(e.target.value)} style={{ width: 100 }} /></Field>
+                <Field label="Number of EMIs" hint={fixed ? `Fixed for ${program.name}` : undefined}><input type="number" min="1" max={maxEmis} value={fixed || count} disabled={!!fixed} onChange={(e) => setCount(e.target.value)} style={{ width: 100 }} /></Field>
                 <Field label="First due date"><input type="date" value={first} onChange={(e) => setFirst(e.target.value)} /></Field>
                 <button style={{ alignSelf: 'flex-end' }} onClick={doSplit} disabled={balance <= 0}>Auto-split {inr(balance)}</button>
               </div>
-              <p className="emi-muted">Equal split, any rupee remainder goes on the last EMI, one month apart. Then edit any row — every student's plan is different.</p>
+              <p className="emi-muted">Equal split, any rupee remainder goes on the last EMI, one month apart. Then edit the amounts and dates of any row{fixed ? ` — the number of EMIs stays at ${fixed} for every ${program.name} student.` : ' — every student\'s plan is different.'}</p>
               {balance === 0 && <div className="alert info">The balance due is zero, so no EMIs are needed.</div>}
               {emis.length > 0 && (
                 <table><thead><tr><th>#</th><th>Amount (₹)</th><th>Due date</th><th /></tr></thead>
@@ -213,7 +216,7 @@ export default function NewEnrollment() {
                     <tr key={i}><td>{i + 1}</td>
                       <td><input type="number" value={e.amount_due} onChange={(ev) => setEmi(i, 'amount_due', ev.target.value)} /></td>
                       <td><input type="date" value={e.due_date} onChange={(ev) => setEmi(i, 'due_date', ev.target.value)} /></td>
-                      <td><button className="small emi-danger" onClick={() => setEmis((l) => l.filter((_, j) => j !== i))}>Remove</button></td></tr>))}</tbody></table>
+                      <td>{!fixed && <button className="small emi-danger" onClick={() => setEmis((l) => l.filter((_, j) => j !== i))}>Remove</button>}</td></tr>))}</tbody></table>
               )}
               {emis.length > 0 && <div className={diff === 0 ? 'diff-ok' : 'diff-bad'}>{diff === 0 ? '✓ EMIs add up to the balance due' : `Difference: ${inr(diff)} (EMIs ${inr(planSum)} vs balance ${inr(balance)})`}{!datesOk && ' · due dates must be ascending'}</div>}
             </div>

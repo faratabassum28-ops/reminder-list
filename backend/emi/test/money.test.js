@@ -165,3 +165,19 @@ test('enrollment: duplicate student in the same batch is blocked; sums must matc
   await assert.rejects(() => money.createEnrollment(admin, { batch: enr.batch, student_id: stu._id, total_fee: 100000, fee_change_reason: 'x', emis: [{ amount_due: 100000, due_date: addDays(today, 5) }] }), /already enrolled/i);
   await assert.rejects(() => money.createEnrollment(admin, { batch: enr.batch, student: { full_name: 'New', phone: '+919811112222', email: 'n@x.com' }, total_fee: 100000, fee_change_reason: 'x', emis: [{ amount_due: 5, due_date: addDays(today, 5) }] }), /add up/i);
 });
+
+test('SUPER is a fixed 10-EMI plan: 3 EMIs are rejected, 10 are accepted, restructure must keep 10', async () => {
+  const program = await models.Program.create({ code: 'SUPER', name: 'SUPER', max_emis: 10, default_fee: 100000 });
+  const batch = await models.Batch.create({ code: 'SUPER-B09', program, batch_name: 'B9', status: 'Running' });
+  models.Batch.findById = (id) => { const row = models.Batch.rows.find((b) => String(b._id) === String(id)); return { populate: async () => row }; };
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ amount_due: 10000, due_date: addDays(today, 30 * (i + 1)) }));
+  const base = (emis, phone) => ({ batch: batch._id, student: { full_name: 'Fixed Plan', phone, email: 'f@example.com' }, total_fee: 100000, fee_change_reason: 'x', emis });
+  await assert.rejects(() => money.createEnrollment(admin, base(mk(3).map((e, i) => ({ ...e, amount_due: i === 2 ? 33334 : 33333 })), '+919811111111')), /10-EMI plan/);
+  const enr = await money.createEnrollment(admin, base(mk(10), '+919822222222'));
+  assert.equal(inst(enr).length, 10);
+  // restructure: re-split the 10 untouched EMIs into 8 -> rejected; into 10 -> fine
+  const eight = Array.from({ length: 8 }, (_, i) => ({ amount_due: 12500, due_date: addDays(today, 30 * (i + 1)) }));
+  await assert.rejects(() => money.restructurePlan(admin, enr._id, eight, 'test'), /10-EMI plan/);
+  await money.restructurePlan(admin, enr._id, mk(10).map((e, i) => ({ ...e, amount_due: i % 2 ? 12000 : 8000 })), 'test');
+  assert.equal(inst(enr).length, 10);
+});
