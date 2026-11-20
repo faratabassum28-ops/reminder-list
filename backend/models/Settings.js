@@ -18,6 +18,8 @@ const settingsSchema = new mongoose.Schema(
     // Guards against sending the daily email twice if the server restarts
     // within the same hour — stores "YYYY-MM-DD" of the last successful send.
     lastReminderSentOn: { type: String, default: null },
+    // Apps an admin switched off for everyone (Admin Settings > Apps). Admins can still open them.
+    appsDisabled: { type: [String], default: [] },
   },
   { timestamps: true }
 );

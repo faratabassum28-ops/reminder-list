@@ -2,7 +2,13 @@ import express from "express";
 import User from "../models/User.js";
 import { hashPassword, comparePassword, signToken } from "../utils/auth.js";
 import { requireAuth, clearAuthCache } from "../middleware/auth.js";
-import { appsOf } from "../utils/access.js";
+import { appsOf, certRoleOf } from "../utils/access.js";
+
+// The profile the frontend keeps. `theme` is null until the person has picked light or dark (they are asked once, on first sign-in).
+const publicUser = (u) => ({
+  id: u._id, name: u.name, email: u.email, role: u.role, slackId: u.slackId, createdAt: u.createdAt,
+  canRequestWorkshops: !!u.canRequestWorkshops, apps: appsOf(u), certRole: certRoleOf(u), theme: u.theme === "dark" || u.theme === "light" ? u.theme : null,
+});
 
 const router = express.Router();
 
@@ -22,10 +28,7 @@ router.post("/login", async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Invalid email or password" });
 
     const token = signToken(user);
-    res.json({
-      token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, slackId: user.slackId, createdAt: user.createdAt, canRequestWorkshops: !!user.canRequestWorkshops, apps: appsOf(user) },
-    });
+    res.json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -35,8 +38,7 @@ router.post("/login", async (req, res) => {
 // load if it has a stored token, to confirm it's still valid and fetch
 // the current user's name/role.
 router.get("/me", requireAuth, (req, res) => {
-  const { _id, name, email, role, slackId, createdAt, canRequestWorkshops } = req.user;
-  res.json({ user: { id: _id, name, email, role, slackId, createdAt, canRequestWorkshops: !!canRequestWorkshops, apps: appsOf(req.user) } });
+  res.json({ user: publicUser(req.user) });
 });
 
 // Self-service profile edit — name and Slack ID only (not email, role, or
@@ -52,7 +54,21 @@ router.put("/me", requireAuth, async (req, res) => {
     if (slackId !== undefined) updates.slackId = slackId.trim();
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select("-passwordHash");
     clearAuthCache();
-    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role, slackId: user.slackId, canRequestWorkshops: !!user.canRequestWorkshops, apps: appsOf(user) } });
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Light or dark mode, chosen by the person (the one-time "which do you prefer?" question, and every switch after it).
+// Saved on the account so it follows them to every phone and computer.
+router.put("/theme", requireAuth, async (req, res) => {
+  const theme = req.body?.theme;
+  if (theme !== "light" && theme !== "dark") return res.status(400).json({ error: "Theme must be light or dark" });
+  try {
+    await User.findByIdAndUpdate(req.user._id, { theme });
+    clearAuthCache();
+    res.json({ theme });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

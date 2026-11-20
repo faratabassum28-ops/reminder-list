@@ -188,6 +188,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Admin Settings (admins only): per-app overview, global on/off switch, and each person's light/dark choice.
+  getAdminOverview: () => request("/admin/overview"),
+  setAppEnabled: (id, enabled) => request(`/admin/apps/${id}`, { method: "PUT", body: JSON.stringify({ enabled }) }),
+  setMyTheme: (theme) => request("/auth/theme", { method: "PUT", body: JSON.stringify({ theme }) }),
+
   removeUser: (id) =>
     request(`/users/${id}`, {
       method: "DELETE",

@@ -9,6 +9,7 @@
 //
 // Data lives in the hub's own database under cert_* collections (+ the certimages GridFS bucket).
 import express from "express";
+import { certRoleOf } from "../utils/access.js";
 import CertTemplate from "./models/CertTemplate.js";
 import CertIssued from "./models/CertIssued.js";
 import CertChangeRequest from "./models/CertChangeRequest.js";
@@ -25,7 +26,7 @@ router.get("/image/:ref", serveImage);
 // Light "what's waiting" numbers for the app chooser. Admins see the approval queue; others see their own requests.
 router.get("/summary", async (req, res, next) => {
   try {
-    const admin = req.user?.role === "admin";
+    const admin = certRoleOf(req.user) === "admin";
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);

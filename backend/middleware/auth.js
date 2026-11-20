@@ -1,6 +1,6 @@
 import User from "../models/User.js";
 import { verifyToken } from "../utils/auth.js";
-import { hasApp } from "../utils/access.js";
+import { hasApp, certRoleOf, getDisabledApps } from "../utils/access.js";
 
 // Requires a valid "Authorization: Bearer <token>" header. Attaches the
 // current user (minus passwordHash) to req.user for downstream routes.
@@ -55,11 +55,19 @@ export function requireAdmin(req, res, next) {
 // ("reminder" = Reminder List, "workshop" = Workshop PMS, "tickets", "orders", "certificates", "emi"). Enforced on the
 // server so a workshop-only user can't reach reminder data by calling the
 // API directly, and vice versa.
+const APP_NAMES = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" };
 export function requireApp(app) {
   return (req, res, next) => {
     if (!hasApp(req.user, app)) {
+      if (req.user?.role !== "admin" && getDisabledApps().includes(app)) return res.status(403).json({ error: `${APP_NAMES[app] || "This app"} is switched off by an admin right now` });
       return res.status(403).json({ error: `Your account doesn't have access to ${{ workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" }[app] || "the Reminder List"}` });
     }
     next();
   };
+}
+
+// Certificate Studio: hub admins and anyone given the Certificate Studio "admin" role (templates, edits, approvals).
+export function requireCertAdmin(req, res, next) {
+  if (certRoleOf(req.user) !== "admin") return res.status(403).json({ error: "Certificate Studio admins only" });
+  next();
 }

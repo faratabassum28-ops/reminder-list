@@ -1,0 +1,21 @@
+.ts-scrim { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; background: rgba(10, 12, 20, 0.62); backdrop-filter: blur(6px); animation: ts-fade 0.25s ease both; }
+.ts-card { width: min(520px, 100%); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 22px; padding: 28px 26px 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4); animation: ts-rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.ts-card h2 { margin: 18px 0 6px; font-size: 24px; letter-spacing: -0.02em; }
+.ts-sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.ts-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ts-opt { text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--panel-alt); border: 2px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 6px; transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s; }
+.ts-opt:hover { transform: translateY(-2px); }
+.ts-opt-on { border-color: var(--accent-2); box-shadow: 0 0 0 4px rgba(109, 79, 192, 0.18); }
+.ts-opt-title { font-weight: 700; font-size: 15px; }
+.ts-opt-hint { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.ts-preview { display: grid; gap: 5px; padding: 10px; border-radius: 10px; height: 70px; align-content: start; }
+.ts-preview i { display: block; height: 8px; border-radius: 4px; }
+.ts-preview i:nth-child(1) { width: 55%; } .ts-preview i:nth-child(2) { width: 85%; } .ts-preview i:nth-child(3) { width: 40%; }
+.ts-preview-dark { background: #10121a; } .ts-preview-dark i { background: #3a3f52; } .ts-preview-dark i:nth-child(1) { background: #a48ae8; }
+.ts-preview-light { background: #eef1f6; border: 1px solid #dfe3ea; } .ts-preview-light i { background: #c7ccd6; } .ts-preview-light i:nth-child(1) { background: #6d4fc0; }
+.ts-error { color: var(--bad); font-size: 13px; margin: 12px 0 0; }
+.ts-go { margin-top: 18px; width: 100%; border: 0; border-radius: 12px; padding: 13px; font: inherit; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, var(--accent-2), var(--accent)); cursor: pointer; }
+.ts-go:disabled { opacity: 0.6; cursor: default; }
+@media (max-width: 440px) { .ts-options { grid-template-columns: 1fr; } }
+@keyframes ts-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ts-rise { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }

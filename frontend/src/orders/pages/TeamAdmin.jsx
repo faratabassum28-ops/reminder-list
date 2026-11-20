@@ -12,9 +12,9 @@ export function TeamCard() {
   return (
     <div className="card">
       <h2>Team</h2>
-      <p className="muted">Everyone signs in once, on the hub, and opens Order Analytics from there. Their desk team (Confirmation, Dispatch, or Admin for everything) is set on the hub&apos;s <Link to="/users">Users</Link> page, and every action in the desks is saved with their name, the time and the status before.</p>
+      <p className="muted">Everyone signs in once, on the hub, and opens Order Analytics from there. Their desk team (Confirmation, Dispatch, or Admin for everything) is set in the hub&apos;s <Link to="/admin/people">Admin Settings &rsaquo; People &amp; access</Link> page, and every action in the desks is saved with their name, the time and the status before.</p>
       <Loading error={error} loading={loading && !data}>
-        {data && people.length === 0 && <div className="banner warn">No one is on the order desks yet. On the hub&apos;s Users page, give a person the Order Analytics app and pick Confirmation and/or Dispatch.</div>}
+        {data && people.length === 0 && <div className="banner warn">No one is on the order desks yet. On the hub&apos;s Admin Settings, give a person the Order Analytics app and pick Confirmation and/or Dispatch.</div>}
         {data && people.length > 0 && (
           <div className="tablewrap"><table>
             <thead><tr><th>Person</th><th>Teams</th><th>Status</th><th>Last opened</th></tr></thead>

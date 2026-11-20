@@ -7,12 +7,12 @@ const TaskList = lazyRetry(() => import("./pages/TaskList.jsx"));
 const Master = lazyRetry(() => import("./pages/Master.jsx"));
 const SubmissionLog = lazyRetry(() => import("./pages/SubmissionLog.jsx"));
 const Settings = lazyRetry(() => import("./pages/Settings.jsx"));
-const Users = lazyRetry(() => import("./pages/Users.jsx"));
 const Notifications = lazyRetry(() => import("./pages/Notifications.jsx"));
 const Messages = lazyRetry(() => import("./pages/Messages.jsx"));
 const Account = lazyRetry(() => import("./pages/Account.jsx"));
 const TicketsApp = lazyRetry(() => import("./tickets/TicketsApp.jsx"));
 const Hub = lazyRetry(() => import("./pages/Hub.jsx"));
+const AdminSettings = lazyRetry(() => import("./pages/AdminSettings.jsx"));
 const WorkshopApp = lazyRetry(() => import("./workshops/WorkshopApp.jsx"));
 const OrdersApp = lazyRetry(() => import("./orders/OrdersApp.jsx"));
 const CertificatesApp = lazyRetry(() => import("./certificates/CertificatesApp.jsx"));
@@ -53,7 +53,7 @@ const baseLinks = [
 const adminLinks = [
   { to: "/doers", label: "Doer List", icon: "doers" },
   { to: "/settings", label: "Settings", icon: "settings" },
-  { to: "/users", label: "Users", icon: "users" },
+  { to: "/admin/apps", label: "Admin Settings", icon: "users" },
 ];
 
 // Wraps admin-only pages — someone could type /settings or /users into the
@@ -135,7 +135,19 @@ export default function App() {
   const inOrders = pathname === "/orders" || pathname.startsWith("/orders/");
   const inCertificates = pathname === "/certificates" || pathname.startsWith("/certificates/");
   const inEmi = pathname === "/emi" || pathname.startsWith("/emi/");
+  const inAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : inCertificates ? "certificates" : inEmi ? "emi" : "reminder";
+
+  // Admin Settings: overall settings for all six apps. Admins only; anyone else is sent back to their apps.
+  if (inAdmin) {
+    if (!isAdmin) return <Navigate to={onlyApp ? homeOf[onlyApp] : "/hub"} replace />;
+    if (pathname === "/admin" || pathname === "/admin/") return <Navigate to="/admin/apps" replace />;
+    return (
+      <Suspense fallback={<LoadingScreen message="Opening Admin Settings" />}>
+        <AdminSettings />
+      </Suspense>
+    );
+  }
 
   if (appCount === 0) {
     return (
@@ -340,7 +352,7 @@ export default function App() {
           <Route path="/messages" element={<Messages />} />
           <Route path="/account" element={<Account />} />
           <Route path="/settings" element={<AdminRoute isAdmin={isAdmin}><Settings /></AdminRoute>} />
-          <Route path="/users" element={<AdminRoute isAdmin={isAdmin}><Users /></AdminRoute>} />
+          <Route path="/users" element={<Navigate to="/admin/people" replace />} />
           <Route path="/notifications" element={<AdminRoute isAdmin={isAdmin}><Notifications /></AdminRoute>} />
         </Routes>
         </Suspense>

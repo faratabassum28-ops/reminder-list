@@ -33,6 +33,19 @@ mern-reminder-app/
 - **Notifications** — **Clear all** and per-item **×** dismiss (page and bell). **View task** now opens Master showing exactly that task (even if you're already on Master).
 - **Speed** — see "Performance notes" below.
 
+## Admin Settings, per-app roles and light/dark choice
+
+- **Admin Settings** (`/admin`, admins only: the "⚙ Admin settings" button on the app chooser and "Admin Settings" in the Reminder List sidebar). Four tabs:
+  **Apps** (all six apps, people per role, global on/off switch), **People & access** (who gets which app and which role inside it),
+  **App settings** (Reminder List settings inline, deep links to the others) and **Appearance** (everyone's light/dark choice; set it or ask again).
+- **Roles per app**: Order Analytics = Confirmation team / Dispatch team / Admin; Certificate Studio = Certificate admin / Certificate issuer-creator
+  (`certRole` on the user); EMI Manager = Admin / Manager / CRM / Viewer (+ verifies payments). Hub admins are admins everywhere.
+- **Apps per person**: tick two apps and that person sees exactly two on the chooser (and the server refuses the rest).
+  An app switched off on the Apps tab is closed to everyone except admins (`Settings.appsDisabled`, `PUT /api/admin/apps/:id`).
+- **Light or dark**: each person is asked once on their next sign-in; the answer is stored on the account (`User.theme`, `PUT /api/auth/theme`)
+  and applied on every device. Later switches with any Light/Dark button are saved too.
+- New endpoints: `GET /api/admin/overview`, `PUT /api/admin/apps/:id`, `PUT /api/auth/theme`. `/users` now redirects to `/admin/people`.
+
 ## Help Ticket Slack reminders + buttons
 
 Tickets are no longer posted to Slack only when raised. For every ticket that is

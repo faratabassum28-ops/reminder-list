@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import CertTemplate from "../models/CertTemplate.js";
-import { requireAdmin } from "../../middleware/auth.js";
+import { requireCertAdmin as requireAdmin } from "../../middleware/auth.js";
 import { saveImage, deleteImage } from "../storage.js";
 
 const ALLOWED = ["image/png", "image/jpeg", "image/webp"];

@@ -3,14 +3,15 @@ import crypto from "crypto";
 import CertTemplate from "../models/CertTemplate.js";
 import CertIssued from "../models/CertIssued.js";
 import CertChangeRequest from "../models/CertChangeRequest.js";
-import { requireAdmin } from "../../middleware/auth.js";
+import { requireCertAdmin as requireAdmin } from "../../middleware/auth.js";
+import { certRoleOf } from "../../utils/access.js";
 
 // Issued certificates, duplicate protection and the change-request workflow.
 // Mounted behind the hub's requireAuth + requireApp("certificates").
-// Roles come from the hub: admin = hub admin; everyone else with the app is a coordinator.
+// Roles come from the hub: admin = hub admin or the Certificate Studio "admin" role; everyone else with the app is an issuer.
 const router = express.Router();
 
-const isAdmin = (req) => req.user?.role === "admin";
+const isAdmin = (req) => certRoleOf(req.user) === "admin";
 const who = (req) => ({ id: String(req.user._id), name: req.user.name });
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L lookalikes

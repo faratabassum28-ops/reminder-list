@@ -14,6 +14,8 @@ import settingsRoutes from "./routes/settings.js";
 import reminderRoutes from "./routes/reminders.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
+import adminRoutes from "./routes/admin.js";
+import { setDisabledApps } from "./utils/access.js";
 import notificationRoutes from "./routes/notifications.js";
 import chatbotRoutes from "./routes/chatbot.js";
 import messageRoutes from "./routes/messages.js";
@@ -153,6 +155,7 @@ app.use("/api/submissions", requireAuth, requireApp("reminder"), submissionRoute
 app.use("/api/settings", requireAuth, requireAdmin, settingsRoutes);
 app.use("/api/reminders", requireAuth, requireAdmin, reminderRoutes);
 app.use("/api/users", requireAuth, requireAdmin, userRoutes);
+app.use("/api/admin", requireAuth, requireAdmin, adminRoutes);
 app.use("/api/notifications", requireAuth, requireAdmin, notificationRoutes);
 // Member-level, like Doers/Tasks/Master — every signed-in person can ask
 // MySoul Assistant questions, the route itself scopes the data snapshot to their role.
@@ -250,6 +253,8 @@ mongoose
     console.log("MongoDB connected");
     grantTicketsAccessOnce().catch((err) => console.error("[migration] tickets access failed:", err.message));
     // Nothing may sit past the Schedule Horizon: drop unfinished rows beyond it.
+    // Apps an admin switched off for everyone (Admin Settings > Apps) are enforced from the first request.
+    getSettings().then((st) => setDisabledApps(st.appsDisabled)).catch((err) => console.error("[apps] could not load the on/off switches:", err.message));
     getSettings()
       .then((st) => st.scheduleHorizon && TaskInstance.deleteMany({ planned: { $gte: new Date(new Date(st.scheduleHorizon).getTime() + 24 * 3600 * 1000) }, actual: null }))
       .then((r) => r && r.deletedCount && console.log(`[horizon] removed ${r.deletedCount} unfinished row(s) past the Schedule Horizon`))

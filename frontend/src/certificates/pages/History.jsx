@@ -12,7 +12,7 @@ const PAGE = 25;
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 export default function History() {
-  const { isAdmin } = useAuth();
+  const { isCertAdmin: isAdmin } = useAuth();
   const { templates } = useTemplates();
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");

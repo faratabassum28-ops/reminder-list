@@ -2,16 +2,16 @@ import express from "express";
 import User from "../models/User.js";
 import { hashPassword } from "../utils/auth.js";
 import { clearAuthCache } from "../middleware/auth.js";
-import { appsOf, cleanApps, cleanOrdersRoles, cleanEmiRole, ordersRolesOf } from "../utils/access.js";
+import { storedAppsOf, cleanApps, cleanOrdersRoles, cleanEmiRole, cleanCertRole, certRoleOf } from "../utils/access.js";
 import { syncOrdersTeam } from "../utils/ordersTeam.js";
 import { syncEmiTeam } from "../utils/emiTeam.js";
 
-// Attach the effective app list so the Users page shows legacy accounts
-// (no stored value) as having both apps.
+// Attach the ticked app list (legacy accounts with no stored value count as having the first three) plus every per-app role.
+// This is what an admin TICKED, even for an app that is switched off for everyone right now, so saving never drops it.
 const withApps = (u) => {
   const o = u.toObject ? u.toObject() : u;
   delete o.passwordHash;
-  return { ...o, apps: appsOf(o), ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [], emiRole: o.role === "admin" ? "Admin" : cleanEmiRole(o.emiRole) || null, emiCanVerify: !!o.emiCanVerify };
+  return { ...o, apps: storedAppsOf(o), certRole: certRoleOf(o), theme: o.theme === "dark" || o.theme === "light" ? o.theme : null, ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [], emiRole: o.role === "admin" ? "Admin" : cleanEmiRole(o.emiRole) || null, emiCanVerify: !!o.emiCanVerify };
 };
 
 const router = express.Router();
@@ -25,12 +25,12 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify } = req.body;
+    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole } = req.body;
     const cleaned = cleanApps(apps);
     const teams = cleanOrdersRoles(ordersRoles) || [];
     if (cleaned && cleaned.length === 0 && role !== "admin") return res.status(400).json({ error: "Pick at least one app" });
-    if (role !== "admin" && cleaned?.includes("orders") && teams.length === 0) return res.status(400).json({ error: "Order Analytics needs a desk team: pick Confirmation and/or Dispatch" });
-    if (role !== "admin" && cleaned?.includes("emi") && !cleanEmiRole(emiRole)) return res.status(400).json({ error: "EMI Manager needs a role: pick Manager, CRM or Viewer" });
+    if (role !== "admin" && cleaned?.includes("orders") && teams.length === 0) return res.status(400).json({ error: "Order Analytics needs a role: pick Confirmation, Dispatch and/or Admin" });
+    if (role !== "admin" && cleaned?.includes("emi") && !cleanEmiRole(emiRole)) return res.status(400).json({ error: "EMI Manager needs a role: pick Admin, Manager, CRM or Viewer" });
     if (!name || !email || !password) return res.status(400).json({ error: "Name, email, and password required" });
     if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
 
@@ -46,6 +46,7 @@ router.post("/", async (req, res) => {
       ordersRoles: teams,
       ...(cleanEmiRole(emiRole) ? { emiRole: cleanEmiRole(emiRole) } : {}),
       emiCanVerify: !!emiCanVerify,
+      ...(cleanCertRole(certRole) ? { certRole: cleanCertRole(certRole) } : {}),
     });
     clearAuthCache();
     syncOrdersTeam();
@@ -61,7 +62,7 @@ router.post("/", async (req, res) => {
 // field.
 router.put("/:id", async (req, res) => {
   try {
-    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify } = req.body;
+    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole, theme } = req.body;
     const updates = {};
     const current = apps !== undefined || ordersRoles !== undefined || emiRole !== undefined || role !== undefined ? await User.findById(req.params.id).lean() : null;
     if (apps !== undefined) {
@@ -76,18 +77,21 @@ router.put("/:id", async (req, res) => {
       const nextApps = updates.apps || (Array.isArray(current?.apps) ? current.apps : []);
       const nextTeams = updates.ordersRoles !== undefined ? updates.ordersRoles : cleanOrdersRoles(current?.ordersRoles) || [];
       if (nextRole !== "admin" && nextApps.includes("orders") && nextTeams.length === 0) {
-        return res.status(400).json({ error: "Order Analytics needs a desk team: pick Confirmation and/or Dispatch" });
+        return res.status(400).json({ error: "Order Analytics needs a role: pick Confirmation, Dispatch and/or Admin" });
       }
     }
     if (emiRole !== undefined) { const r = cleanEmiRole(emiRole); if (r) updates.emiRole = r; }
     if (emiCanVerify !== undefined) updates.emiCanVerify = !!emiCanVerify;
+    if (certRole !== undefined) { const r = cleanCertRole(certRole); if (r) updates.certRole = r; }
+    // An admin can send someone back to the "light or dark?" question (null), or set their mode for them.
+    if (theme !== undefined) { if (theme === null || theme === "light" || theme === "dark") updates.theme = theme; }
     // Whatever the account will look like after this save: EMI Manager needs a role (admins are EMI admins and need none).
     {
       const nextRole = role !== undefined ? (role === "admin" ? "admin" : "member") : current?.role;
       const nextApps = updates.apps || (Array.isArray(current?.apps) ? current.apps : []);
       const nextEmiRole = updates.emiRole || cleanEmiRole(current?.emiRole);
       if (nextRole !== "admin" && nextApps.includes("emi") && !nextEmiRole) {
-        return res.status(400).json({ error: "EMI Manager needs a role: pick Manager, CRM or Viewer" });
+        return res.status(400).json({ error: "EMI Manager needs a role: pick Admin, Manager, CRM or Viewer" });
       }
     }
     if (name !== undefined) updates.name = name;

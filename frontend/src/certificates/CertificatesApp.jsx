@@ -43,7 +43,7 @@ export default function CertificatesApp() {
 }
 
 function Shell() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasEmi } = useAuth();
+  const { user, logout, isCertAdmin: isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasEmi } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { templates, error: tplError } = useTemplates();
   const navigate = useNavigate();
@@ -156,7 +156,7 @@ function Shell() {
             {!collapsed && (
               <div className="sidebar-user-info">
                 <div className="sidebar-user-name">{user.name}</div>
-                <div className="sidebar-user-role">{isAdmin ? "Admin" : "Coordinator"}</div>
+                <div className="sidebar-user-role">{isAdmin ? "Admin" : "Issuer"}</div>
               </div>
             )}
           </NavLink>

@@ -7,6 +7,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { NetworkProvider } from "./context/NetworkContext.jsx";
 import NetworkBanner from "./components/NetworkBanner.jsx";
+import ThemeSync from "./components/ThemeSync.jsx";
 import RouteBoundary from "./components/RouteBoundary.jsx";
 import "./index.css";
 import "./loaders.css";
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               <RouteBoundary fullscreen>
                 <App />
               </RouteBoundary>
+              <ThemeSync />
             </AuthProvider>
           </ToastProvider>
           <NetworkBanner />
