@@ -106,3 +106,33 @@ test('phone normalisation and templates', () => {
   assert.equal(E.renderTemplate('Hi {name}, {amount}', { name: 'A', amount: '₹5' }), 'Hi A, ₹5');
   assert.equal(E.fmtDate('2026-11-05'), '05 Nov 2026');
 });
+
+/* ---------- Fixed 10-EMI plan (PMS: every SUPER student has EMI 1..10) ---------- */
+test('fixedEmiCount: SUPER is 10 by code; a program can pin its own; others are free', () => {
+  assert.equal(E.fixedEmiCount({ code: 'SUPER' }), 10);
+  assert.equal(E.fixedEmiCount({ code: 'super', fixed_emis: null }), 10);
+  assert.equal(E.fixedEmiCount({ code: 'RGM' }), null);
+  assert.equal(E.fixedEmiCount({ code: 'RGM', fixed_emis: 4 }), 4);
+});
+
+test('planFixedEmis: 7-EMI student with 2 paid becomes 2 locked + 8 re-split, same total', () => {
+  const mk = (n, due, paid) => ({ id: 'i' + n, type: 'EMI', emi_number: n, amount_due: 30000, due_date: due, amount_paid: paid, waived: false });
+  const insts = [mk(1, '2026-05-05', 30000), mk(2, '2026-06-05', 30000), ...[3, 4, 5, 6, 7].map((n) => mk(n, `2026-${String(n + 4).padStart(2, '0')}-05`, 0))];
+  const p = E.planFixedEmis(insts, 10);
+  assert.equal(p.status, 'fix');
+  assert.equal(p.locked, 2);
+  assert.equal(p.emis.length, 8);
+  assert.equal(E.sum(p.emis, (e) => e.amount_due), 150000);
+  assert.equal(p.emis[0].due_date, '2026-07-05');
+  assert.equal(p.emis[7].due_date, '2027-02-05');
+});
+
+test('planFixedEmis: already 10, fully paid, and part-paid edge cases', () => {
+  const base = { type: 'EMI', amount_due: 1000, due_date: '2026-06-05', amount_paid: 0, waived: false };
+  assert.equal(E.planFixedEmis(Array.from({ length: 10 }, (_, i) => ({ ...base, id: 'a' + i, emi_number: i + 1 })), 10).status, 'already');
+  assert.equal(E.planFixedEmis(Array.from({ length: 6 }, (_, i) => ({ ...base, id: 'b' + i, emi_number: i + 1, amount_paid: 1000 })), 10).status, 'manual');
+  // a part-paid EMI counts as locked and keeps its own amount
+  const part = [{ ...base, id: 'p1', emi_number: 1, amount_paid: 400 }, { ...base, id: 'p2', emi_number: 2, due_date: '2026-07-05' }];
+  const p = E.planFixedEmis(part, 10);
+  assert.equal(p.status, 'fix'); assert.equal(p.locked, 1); assert.equal(p.emis.length, 9); assert.equal(E.sum(p.emis, (e) => e.amount_due), 1000);
+});

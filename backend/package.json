@@ -17,7 +17,8 @@
     "test:orders": "node --test \"orders/test/*.test.js\"",
     "migrate:certificates": "node certificates/migrate-standalone.js",
     "test:emi": "node --test \"emi/test/*.test.js\"",
-    "seed:emi": "node emi/src/seed.js"
+    "seed:emi": "node emi/src/seed.js",
+    "fix:emi-count": "node emi/src/scripts/normalize-emis.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -33,6 +33,7 @@ const Program = model('Program', new Schema({
   default_application_fee: { type: Number, default: 0, min: 0 },
   default_commitment_fee: { type: Number, default: 0, min: 0 },
   max_emis: { type: Number, default: 12, min: 1 },
+  fixed_emis: { type: Number, default: null, min: 1 }, // when set, every student on this program has exactly this many EMIs
   active: { type: Boolean, default: true },
 }, opts));
 

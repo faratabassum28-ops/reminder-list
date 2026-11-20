@@ -13,7 +13,7 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[–—-]/g, ' ').rep
 
 const TEMPLATE = [
   'program,batch,full_name,phone,email,total_fee,adjustment_1_name,adjustment_1_amount,adjustment_2_name,adjustment_2_amount,application_fee,commitment_fee,emi_count,emi1_amount,emi1_due,emi1_paid,emi2_amount,emi2_due,emi2_paid',
-  'SUPER,Batch 7 - Oct 2026,Sample Student,+919800000000,sample@email.com,250000,Tarot L1,10000,Reiki L1+L2,6999,10000,40000,6,30500,2026-11-05,30500,30500,2026-12-05,0',
+  'SUPER,Batch 7 - Oct 2026,Sample Student,+919800000000,sample@email.com,250000,Tarot L1,10000,Reiki L1+L2,6999,10000,40000,10,30500,2026-11-05,30500,30500,2026-12-05,0',
 ].join('\n');
 
 router.get('/import/template', auth, mgr, (req, res) => {
@@ -67,6 +67,8 @@ function parseRow(raw, ctx) {
   const application_fee = int('application_fee', 'Application fee');
   const commitment_fee = int('commitment_fee', 'Commitment fee');
   const emi_count = int('emi_count', 'EMI count', { required: true });
+  const fixed = E.fixedEmiCount(program);
+  if (fixed && emi_count !== fixed) errors.push(`${program.name} is a ${fixed}-EMI plan, but emi_count is ${emi_count}`);
   const fees = E.computeFees({ total_fee, adjustments, discount: 0, application_fee, commitment_fee });
 
   const emis = [];

@@ -120,8 +120,14 @@ const ctx = { programs: [program], batches: [{ _id: 'b1', program: 'p1', batch_n
 const goodRow = {
   program: 'SUPER', batch: 'Batch 7 - Oct 2026', full_name: 'Sample Student', phone: '9800000000', email: 's@x.com', total_fee: '250000',
   adjustment_1_name: 'Tarot L1', adjustment_1_amount: '10000', adjustment_2_name: 'Reiki L1+L2', adjustment_2_amount: '6999',
-  application_fee: '10000', commitment_fee: '40000', emi_count: '2', emi1_amount: '91500', emi1_due: '2026-11-05', emi1_paid: '91500', emi2_amount: '91501', emi2_due: '2026-12-05', emi2_paid: '0',
+  application_fee: '10000', commitment_fee: '40000', emi_count: '10',
 };
+// SUPER is a fixed 10-EMI plan (as in the PMS): 9 x 18,300 + 18,301 = 183,001
+for (let k = 1; k <= 10; k++) {
+  goodRow[`emi${k}_amount`] = String(k === 10 ? 18301 : 18300);
+  { const m = 9 + k; goodRow[`emi${k}_due`] = `${2026 + (m > 12 ? 1 : 0)}-${String(((m - 1) % 12) + 1).padStart(2, '0')}-05`; }
+  goodRow[`emi${k}_paid`] = k === 1 ? '18300' : '0';
+}
 
 test('importer accepts a valid sheet row (dash-insensitive batch match, phone normalised)', () => {
   const r = importer.parseRow(goodRow, ctx);
@@ -132,8 +138,13 @@ test('importer accepts a valid sheet row (dash-insensitive batch match, phone no
   assert.equal(r.payload.adjustments[0].adjustment, 't1');
 });
 
+test('importer rejects a SUPER row that is not a 10-EMI plan', () => {
+  const r = importer.parseRow({ ...goodRow, emi_count: '6' }, ctx);
+  assert.match(r.errors.join(' '), /10-EMI plan, but emi_count is 6/);
+});
+
 test('importer flags EMI sum mismatch, bad dates, overpaid EMIs, unknown batch', () => {
-  assert.match(importer.parseRow({ ...goodRow, emi2_amount: '91000' }, ctx).errors.join(' '), /difference/);
+  assert.match(importer.parseRow({ ...goodRow, emi10_amount: '18000' }, ctx).errors.join(' '), /difference/);
   assert.match(importer.parseRow({ ...goodRow, emi1_due: '05/11/2026' }, ctx).errors.join(' '), /due date/);
   assert.match(importer.parseRow({ ...goodRow, emi1_paid: '99999' }, ctx).errors.join(' '), /more than/);
   assert.match(importer.parseRow({ ...goodRow, batch: 'Batch 99' }, ctx).errors.join(' '), /not found/);

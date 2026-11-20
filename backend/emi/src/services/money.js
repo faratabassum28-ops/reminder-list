@@ -80,6 +80,8 @@ async function createEnrollment(user, p, { imported = false } = {}) {
   const planErrors = E.validatePlan(fees.balance_due, emis);
   if (planErrors.length) throw bad(planErrors.join('; '));
   if (emis.length > program.max_emis) throw bad(`${program.name} allows at most ${program.max_emis} EMIs`);
+  const fixed = E.fixedEmiCount(program);
+  if (fixed && fees.balance_due > 0 && emis.length !== fixed) throw bad(`${program.name} is a ${fixed}-EMI plan for every student (the plan has ${emis.length})`);
 
   // ---- write ----
   const created = { student: null, enrollment: null };
@@ -284,6 +286,8 @@ async function restructurePlan(user, enrollmentId, emis, reason) {
   if (errs.length) throw bad(errs.join('; '));
   const lockedCount = all.filter((i) => !editable.includes(i) && !i.waived).length;
   if (lockedCount + clean.length > enr.batch.program.max_emis) throw bad(`${enr.batch.program.name} allows at most ${enr.batch.program.max_emis} EMIs`);
+  const fixed = E.fixedEmiCount(enr.batch.program);
+  if (fixed && lockedCount + clean.length !== fixed) throw bad(`${enr.batch.program.name} is a ${fixed}-EMI plan: with ${lockedCount} EMI(s) already paid or part-paid, the new plan needs exactly ${fixed - lockedCount} EMIs (it has ${clean.length})`);
 
   const old = editable.map((i) => ({ emi_number: i.emi_number, amount_due: i.amount_due, due_date: i.due_date }));
   // insert the new plan first, then remove the old rows, so a failure can never leave the student with no schedule

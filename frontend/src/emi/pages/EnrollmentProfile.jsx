@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import { Link, useParams } from '../router';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { inr, fmtDate, fmtDateTime, waChat, useFetch, useLiveReload } from '../util';
+import { inr, fmtDate, fmtDateTime, waChat, useFetch, useLiveReload, todayIST, addMonths } from '../util';
 import { AuthFile, Badge, ErrorBox, Field, FileInput, Loading, Modal, Empty, Tabs } from '../components/ui';
 import Receipt from '../components/Receipt';
 import HistoryTimeline from '../components/History';
@@ -186,11 +186,16 @@ function RestructureModal({ d, onClose, onDone }) {
   // paid and part-paid EMIs are locked; only untouched ones can change
   const editable = d.instalments.filter((i) => i.type === 'EMI' && i.amount_paid === 0 && i.status !== 'Waived');
   const pool = editable.reduce((a, i) => a + i.amount_due, 0);
+  const fixed = d.program && d.program.fixed_emis; // fixed-EMI program (SUPER = 10): locked + new rows must equal it
+  const lockedCount = d.instalments.filter((i) => i.type === 'EMI' && i.status !== 'Waived').length - editable.length;
+  const need = fixed ? fixed - lockedCount : null;
   const [rows, setRows] = useState(editable.map((i) => ({ amount_due: String(i.amount_due), due_date: i.due_date })));
   const [reason, setReason] = useState('');
   const [err, setErr] = useState('');
   const sum = rows.reduce((a, r) => a + Number(r.amount_due || 0), 0);
   const diff = pool - sum;
+  const countOk = !fixed || rows.length === need;
+  const resplit = () => { const base = Math.floor(pool / need); const rem = pool - base * need; const start = (rows[0] && rows[0].due_date) || todayIST(); setRows(Array.from({ length: need }, (_, i) => ({ amount_due: String(i === need - 1 ? base + rem : base), due_date: addMonths(start, i) }))); };
   const set = (i, k, v) => setRows((l) => l.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const [busy, setBusy] = useState(false);
   const go = async () => {
@@ -199,11 +204,12 @@ function RestructureModal({ d, onClose, onDone }) {
     try { await api.put(`/enrollments/${d.enrollment.id}/plan`, { emis: rows.map((r) => ({ amount_due: Number(r.amount_due), due_date: r.due_date })), reason }); onDone(); } catch (e) { setErr(e.message); setBusy(false); }
   };
   return (
-    <Modal title="Restructure EMI plan" wide onClose={onClose} footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={diff !== 0 || !reason.trim() || !rows.length || busy} onClick={go}>{busy ? 'Saving…' : 'Save new plan'}</button></>}>
+    <Modal title="Restructure EMI plan" wide onClose={onClose} footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={diff !== 0 || !countOk || !reason.trim() || !rows.length || busy} onClick={go}>{busy ? 'Saving…' : 'Save new plan'}</button></>}>
       <div className="alert info">Paid and part-paid EMIs are locked. The unpaid EMIs below must still add up to {inr(pool)}. The old plan is kept in the history.</div>
+      {fixed && <div className={countOk ? 'alert info' : 'alert emi-error'}>This is a {fixed}-EMI plan: with {lockedCount} EMI(s) already paid or part-paid, the plan needs exactly {need} more EMIs (now {rows.length}). {need >= 1 && <button className="small" onClick={resplit}>Split {inr(pool)} equally into {need} EMIs</button>}</div>}
       <table><thead><tr><th>#</th><th>Amount (₹)</th><th>Due date</th><th /></tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i}><td>{i + 1}</td><td><input type="number" value={r.amount_due} onChange={(e) => set(i, 'amount_due', e.target.value)} /></td><td><input type="date" value={r.due_date} onChange={(e) => set(i, 'due_date', e.target.value)} /></td><td><button className="small emi-danger" onClick={() => setRows((l) => l.filter((_, j) => j !== i))}>Remove</button></td></tr>)}</tbody></table>
-      <p><button onClick={() => setRows([...rows, { amount_due: '', due_date: rows.length ? rows[rows.length - 1].due_date : '' }])}>+ Add EMI</button></p>
+        <tbody>{rows.map((r, i) => <tr key={i}><td>{i + 1}</td><td><input type="number" value={r.amount_due} onChange={(e) => set(i, 'amount_due', e.target.value)} /></td><td><input type="date" value={r.due_date} onChange={(e) => set(i, 'due_date', e.target.value)} /></td><td>{!fixed && <button className="small emi-danger" onClick={() => setRows((l) => l.filter((_, j) => j !== i))}>Remove</button>}</td></tr>)}</tbody></table>
+      <p>{!fixed && <button onClick={() => setRows([...rows, { amount_due: '', due_date: rows.length ? rows[rows.length - 1].due_date : '' }])}>+ Add EMI</button>}</p>
       <div className={diff === 0 ? 'diff-ok' : 'diff-bad'}>{diff === 0 ? '✓ Adds up' : `Difference: ${inr(diff)}`}</div>
       <Field label="Reason (required, logged)"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       {err && <div className="alert emi-error">{err}</div>}

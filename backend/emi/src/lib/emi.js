@@ -5,6 +5,16 @@ const { diffDays, addMonths, isValidDate } = require('./dates');
 const DEFAULT_RULES = { days_before: 3, grace_days: 2, defaulter_days: 30 };
 const MANUAL_STATUSES = ['Paused', 'Refunded', 'Dropped'];
 
+/* ---------- Fixed EMI count ----------
+   The PMS gives every SUPER student the same 10-EMI plan (EMI 1..10, after the upfront EMI 0).
+   A program can pin this with `fixed_emis`; SUPER is pinned here too, so it holds even before the setting is saved. */
+const FIXED_EMIS_BY_PROGRAM = { SUPER: 10 };
+function fixedEmiCount(program) {
+  if (!program) return null;
+  if (Number.isInteger(program.fixed_emis) && program.fixed_emis > 0) return program.fixed_emis;
+  return FIXED_EMIS_BY_PROGRAM[String(program.code || '').toUpperCase()] || null;
+}
+
 const isInt = (n) => Number.isInteger(n);
 const sum = (arr, f = (x) => x) => arr.reduce((a, x) => a + (f(x) || 0), 0);
 
@@ -28,6 +38,26 @@ function autoSplit(balance, count, firstDate) {
     amount_due: i === count - 1 ? base + rem : base,
     due_date: addMonths(firstDate, i),
   }));
+}
+
+/* ---------- Bring an existing plan to the fixed EMI count (used by scripts/normalize-emis.js) ----------
+   Paid / part-paid EMIs are never touched. The still-untouched EMIs keep their combined amount and are re-split
+   equally (rupee remainder on the last one), monthly from the first untouched EMI's due date, so that
+   (locked EMIs + new EMIs) === fixed.  `touchedIds` = instalments that appear in any payment.            */
+function planFixedEmis(instalments, fixed, touchedIds = new Set()) {
+  const live = instalments.filter((i) => i.type === 'EMI' && !i.waived)
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : (a.emi_number || 0) - (b.emi_number || 0)));
+  if (live.length === fixed) return { status: 'already', count: live.length };
+  const editable = live.filter((i) => !(i.amount_paid > 0) && !touchedIds.has(String(i.id || i._id)));
+  const locked = live.filter((i) => !editable.includes(i));
+  if (!editable.length) return { status: 'manual', count: live.length, reason: `all ${live.length} EMIs are already paid / part-paid (cannot add EMIs to a fully-paid plan)` };
+  const need = fixed - locked.length;
+  if (need < 1) return { status: 'manual', count: live.length, reason: `${locked.length} EMIs are already paid / part-paid, which leaves no room for a ${fixed}-EMI plan` };
+  const pool = sum(editable, (i) => i.amount_due);
+  if (pool < need) return { status: 'manual', count: live.length, reason: `only ${pool} rupees left to split over ${need} EMIs` };
+  let first = editable[0].due_date;
+  if (locked.length) { const lastLocked = locked[locked.length - 1].due_date; if (lastLocked > first) first = lastLocked; }
+  return { status: 'fix', count: live.length, locked: locked.length, pool, emis: autoSplit(pool, need, first), old: editable.map((i) => ({ emi_number: i.emi_number, amount_due: i.amount_due, due_date: i.due_date })) };
 }
 
 /* ---------- Plan validation: sum must equal balance exactly, dates ascending ---------- */
@@ -167,7 +197,7 @@ function normalizePhone(p) {
 const isValidPhone = (p) => /^\+\d{8,15}$/.test(p);
 
 module.exports = {
-  DEFAULT_RULES, MANUAL_STATUSES, computeFees, autoSplit, validatePlan, instalmentState,
+  DEFAULT_RULES, MANUAL_STATUSES, FIXED_EMIS_BY_PROGRAM, fixedEmiCount, computeFees, autoSplit, planFixedEmis, validatePlan, instalmentState,
   enrollmentStatus, studentBucket, allocatePayment, recalcFromPayments, renderTemplate,
   pickTemplateKey, fmtINR, fmtDate, normalizePhone, isValidPhone, sum,
 };

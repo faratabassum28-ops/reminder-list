@@ -144,7 +144,7 @@ router.get('/enrollments/:id', auth, h(async (req, res) => {
   res.json({
     student: row.student,
     batch: { id: row.batch._id, code: row.batch.code, name: row.batch.batch_name, status: row.batch.status, owner: row.batch.owner && row.batch.owner.name },
-    program: { id: row.batch.program._id, name: row.batch.program.name, max_emis: row.batch.program.max_emis },
+    program: { id: row.batch.program._id, name: row.batch.program.name, max_emis: row.batch.program.max_emis, fixed_emis: E.fixedEmiCount(row.batch.program) },
     enrollment: {
       id: row.id, enrollment_date: e.enrollment_date, closed_by: e.closed_by, total_fee: e.total_fee, fee_change_reason: e.fee_change_reason,
       adjustments: e.adjustments, discount: e.discount, discount_reason: e.discount_reason, application_fee_paid: e.application_fee_paid,

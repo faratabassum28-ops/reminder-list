@@ -30,6 +30,10 @@ export function addMonths(s, n) {
   return `${yy}-${String(mm + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 
+// Same rule as the server: a program can be a fixed N-EMI plan (SUPER = 10, as in the PMS)
+export const FIXED_EMIS_BY_PROGRAM = { SUPER: 10 };
+export const fixedEmis = (p) => (p ? (Number.isInteger(p.fixed_emis) && p.fixed_emis > 0 ? p.fixed_emis : FIXED_EMIS_BY_PROGRAM[String(p.code || '').toUpperCase()] || null) : null);
+
 // Same rule as the server: equal split, rupee remainder on the last EMI
 export function autoSplit(balance, count, firstDate) {
   if (!count || count < 1 || !firstDate) return [];

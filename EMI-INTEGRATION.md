@@ -40,3 +40,13 @@ There is no separate EMI sign-in or password any more.
 
 No MongoDB was available in the build sandbox, so the live-database path (connecting with `EMI_MONGO_URI`, the first-login e-mail
 linking) was exercised only against stand-in models. Please smoke-test once after deploy: open `/emi`, check Home numbers match the old app.
+
+
+## Fixed 10-EMI plan for SUPER (matches the PMS)
+
+The PMS gives every SUPER student the same plan: EMI 0 (upfront) then EMI 1–10. EMI Manager now enforces this:
+* New enrolment, CSV import and "Restructure plan" must produce exactly **10 EMIs** for SUPER (the number box is locked at 10, rows can't be removed).
+  Set per program under Settings → Programs → *Fixed EMIs*; SUPER is pinned to 10 in code, so no setting is needed. RGM stays flexible.
+* Students already saved with 6/7/8 EMIs are fixed once with: `cd backend && npm run fix:emi-count` (dry run, writes `emi-normalize-report.csv`),
+  then `npm run fix:emi-count -- --apply`. Paid / part-paid EMIs are untouched; the unpaid EMIs keep their combined amount and are re-split equally
+  over the remaining slots, monthly. Each change is logged (plan history + activity). Anything unsafe is listed as MANUAL and left alone.

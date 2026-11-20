@@ -44,6 +44,7 @@ function programFields(b) {
     default_application_fee: num(b.default_application_fee, 'Default application fee'),
     default_commitment_fee: num(b.default_commitment_fee, 'Default commitment fee'),
     max_emis: num(b.max_emis || 12, 'Max EMIs', 1),
+    fixed_emis: b.fixed_emis ? num(b.fixed_emis, 'Fixed EMIs', 1) : null,
     active: b.active !== false,
   };
 }
