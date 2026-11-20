@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import PageHeader from "../components/PageHeader.jsx";
@@ -9,19 +10,24 @@ import SearchInput from "../components/SearchInput.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { avatarStyleFromString, initials } from "../utils/colorFromString.js";
 
-const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [], emiRole: "CRM", emiCanVerify: false };
+const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [], emiRole: "CRM", emiCanVerify: false, certRole: "issuer" };
 
 const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" };
 const APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
 // EMI Manager roles. Admins are EMI admins automatically.
-const EMI_ROLES = ["Manager", "CRM", "Viewer"];
-const EMI_ROLE_HINT = { Manager: "Settings, imports, discounts, collections team", CRM: "Enrols students, records payments, logs calls", Viewer: "Read-only (can be allowed to verify payments)" };
+const EMI_ROLES = ["Admin", "Manager", "CRM", "Viewer"];
+const EMI_ROLE_HINT = { Admin: "Everything in EMI Manager, including users' batch access and backups", Manager: "Settings, imports, discounts, collections team", CRM: "Enrols students, records payments, logs calls", Viewer: "Read-only (can be allowed to verify payments)" };
 // Order Analytics desk teams: Confirmation calls and confirms new orders, Dispatch slips / packs / hands over.
-const TEAM_LABEL = { confirmation: "Confirmation", packing: "Dispatch" };
-const TEAMS = ["confirmation", "packing"];
+const TEAM_LABEL = { confirmation: "Confirmation team", packing: "Dispatch team", admin: "Admin" };
+const TEAM_HINT = { confirmation: "Calls and confirms new orders", packing: "Prints slips, packs and hands orders to the courier", admin: "Sees and manages everything in Order Analytics" };
+const TEAMS = ["confirmation", "packing", "admin"];
+// Certificate Studio roles. Admin = templates, edits, approvals. Issuer (creator) = issues certificates and requests changes.
+const CERT_ROLES = ["issuer", "admin"];
+const CERT_LABEL = { issuer: "Certificate issuer / creator", admin: "Certificate admin" };
 
-export default function Users() {
+export default function Users({ embedded = false }) {
   const { user: currentUser } = useAuth();
+  const [params] = useSearchParams();
   const [users, setUsers] = useState(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
@@ -32,7 +38,7 @@ export default function Users() {
   const [slackEditValue, setSlackEditValue] = useState("");
   const [slackSaving, setSlackSaving] = useState(false);
   const [q, setQ] = useState("");
-  const [appTab, setAppTab] = useState("all"); // all | reminder | workshop
+  const [appTab, setAppTab] = useState(["reminder", "workshop", "tickets", "orders", "certificates", "emi"].includes(params.get("app")) ? params.get("app") : "all");
   const toast = useToast();
 
   const load = () => api.getUsers().then(setUsers).catch((e) => setError(e.message));
@@ -47,11 +53,11 @@ export default function Users() {
       return;
     }
     if (form.role !== "admin" && form.apps.includes("orders") && form.ordersRoles.length === 0) {
-      toast("Order Analytics needs a desk team: pick Confirmation and/or Dispatch", "bad");
+      toast("Order Analytics needs a role: pick Confirmation team, Dispatch team and/or Admin", "bad");
       return;
     }
     try {
-      await api.createUser({ ...form, emiRole: form.apps.includes("emi") ? form.emiRole : undefined });
+      await api.createUser({ ...form, emiRole: form.apps.includes("emi") ? form.emiRole : undefined, certRole: form.apps.includes("certificates") ? form.certRole : undefined });
       setForm(empty);
       load();
       toast(`Added ${form.name} as ${form.role}`, "good");
@@ -99,6 +105,7 @@ export default function Users() {
     const body = { apps: next };
     if (app === "orders" && !has && !(u.ordersRoles || []).length) body.ordersRoles = ["confirmation"];
     if (app === "emi" && !has && !u.emiRole) body.emiRole = "CRM";
+    if (app === "certificates" && !has && !u.certRole) body.certRole = "issuer";
     setBusyId(u._id);
     try {
       const updated = await api.updateUser(u._id, body);
@@ -116,7 +123,7 @@ export default function Users() {
     try {
       const updated = await api.updateUser(u._id, patch);
       setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
-      toast(`${u.name}: EMI Manager updated`, "good");
+      toast(`${u.name}: role updated`, "good");
     } catch (err) {
       toast(err.message, "bad");
     } finally {
@@ -128,14 +135,14 @@ export default function Users() {
     const cur = u.ordersRoles || [];
     const next = cur.includes(team) ? cur.filter((t) => t !== team) : [...cur, team];
     if (next.length === 0) {
-      toast("Order Analytics needs at least one desk team — remove the app instead", "bad");
+      toast("Order Analytics needs at least one role — remove the app instead", "bad");
       return;
     }
     setBusyId(u._id);
     try {
       const updated = await api.updateUser(u._id, { ordersRoles: next });
       setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
-      toast(`${u.name}: ${TEAM_LABEL[team]} desk ${cur.includes(team) ? "removed" : "added"}`, "good");
+      toast(`${u.name}: ${TEAM_LABEL[team]} ${cur.includes(team) ? "removed" : "added"}`, "good");
     } catch (err) {
       toast(err.message, "bad");
     } finally {
@@ -210,12 +217,16 @@ export default function Users() {
   }, [users, needle, appTab]);
 
   return (
-    <div className="page">
-      <PageHeader
-        title="Users"
-        subtitle="Who can sign in, and what they're allowed to do"
-        meta={users && <span className="chip"><strong>{users.length}</strong> accounts</span>}
-      />
+    <div className={embedded ? "" : "page"}>
+      {embedded ? (
+        <div className="toolbar" style={{ marginBottom: 6 }}>{users && <span className="chip"><strong>{users.length}</strong> accounts</span>}</div>
+      ) : (
+        <PageHeader
+          title="Users"
+          subtitle="Who can sign in, and what they're allowed to do"
+          meta={users && <span className="chip"><strong>{users.length}</strong> accounts</span>}
+        />
+      )}
       {error && <p className="error">{error}</p>}
 
       <form className="inline-form" onSubmit={submit}>
@@ -242,12 +253,12 @@ export default function Users() {
           </label>
         ))}
         {form.role !== "admin" && form.apps.includes("orders") && TEAMS.map((t) => (
-          <label key={t} className="ws-inline-check" title={t === "confirmation" ? "Calls and confirms new orders" : "Prints slips, packs and hands orders to the courier"}>
+          <label key={t} className="ws-inline-check" title={TEAM_HINT[t]}>
             <input
               type="checkbox"
               checked={form.ordersRoles.includes(t)}
               onChange={(e) => setForm({ ...form, ordersRoles: e.target.checked ? [...form.ordersRoles, t] : form.ordersRoles.filter((x) => x !== t) })}
-            /> {TEAM_LABEL[t]} desk
+            /> Orders: {TEAM_LABEL[t]}
           </label>
         ))}
         {form.role !== "admin" && form.apps.includes("emi") && (
@@ -260,6 +271,11 @@ export default function Users() {
             </label>
           </>
         )}
+        {form.role !== "admin" && form.apps.includes("certificates") && (
+          <select value={form.certRole} onChange={(e) => setForm({ ...form, certRole: e.target.value })} title="Role inside Certificate Studio">
+            {CERT_ROLES.map((r) => <option key={r} value={r}>Certificates: {CERT_LABEL[r]}</option>)}
+          </select>
+        )}
         <label className="ws-inline-check" title="Lets this person fill the New Workshop form in Workshop PMS (admins approve)">
           <input type="checkbox" checked={form.canRequestWorkshops} onChange={(e) => setForm({ ...form, canRequestWorkshops: e.target.checked })} /> Workshop coordinator
         </label>
@@ -269,7 +285,7 @@ export default function Users() {
         <strong>Admins</strong> can delete data, manage Settings, and manage other accounts. <strong>Members</strong> can
         do day-to-day work — add, edit, complete, export — but not delete anything or reach Settings/Users. Slack ID is
         optional; people can also set their own from the Account page. <strong>App access</strong> decides which app a
-        person can open — Reminder List, Workshop PMS, Help Tickets, Certificate Studio, or any mix (admins always get all). In Certificate Studio, admins manage templates and approve change requests; everyone else is a coordinator who issues certificates. <strong>Order Analytics</strong> is switched on per person and needs a desk team — Confirmation and/or Dispatch — which decides what they see there; admins see everything. A person with only one app
+        person can open — Reminder List, Workshop PMS, Help Tickets, Certificate Studio, or any mix (admins always get all). In Certificate Studio, a <strong>Certificate admin</strong> manages templates and approves change requests; a <strong>Certificate issuer / creator</strong> issues certificates and requests corrections. <strong>Order Analytics</strong> is switched on per person with a role — Confirmation team, Dispatch team and/or Admin — which decides what they see there. <strong>EMI Manager</strong> has Admin, Manager, CRM and Viewer roles. A person with only one app
         goes straight into it and never sees the others.
       </p>
 
@@ -363,9 +379,17 @@ export default function Users() {
                       </label>
                     </div>
                   )}
+                  {u.role !== "admin" && u.apps.includes("certificates") && (
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span className="muted" style={{ fontSize: 12 }}>Certificates:</span>
+                      <select value={u.certRole || "issuer"} disabled={busyId === u._id} onChange={(e) => setEmi(u, { certRole: e.target.value })}>
+                        {CERT_ROLES.map((r) => <option key={r} value={r}>{CERT_LABEL[r]}</option>)}
+                      </select>
+                    </div>
+                  )}
                   {u.role !== "admin" && u.apps.includes("orders") && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      <span className="muted" style={{ fontSize: 12 }}>Order desk:</span>
+                      <span className="muted" style={{ fontSize: 12 }}>Orders:</span>
                       {TEAMS.map((t) => {
                         const on = (u.ordersRoles || []).includes(t);
                         return (
@@ -373,7 +397,7 @@ export default function Users() {
                             className={"role-toggle " + (on ? "role-admin" : "role-member")}
                             disabled={busyId === u._id}
                             onClick={() => toggleTeam(u, t)}
-                            title={`Click to ${on ? "remove" : "add"} the ${TEAM_LABEL[t]} desk`}>
+                            title={`${TEAM_HINT[t]}. Click to ${on ? "remove" : "add"}.`}>
                             {on ? "✓ " : "+ "}{TEAM_LABEL[t]}
                           </button>
                         );

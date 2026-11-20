@@ -5,10 +5,10 @@ const crypto = require('crypto');
 const A = require('./staffAuth');
 
 const TEAM_ROLES = ['confirmation', 'packing'];
-// The hub's role -> the roles this site uses. Admin stands alone; everyone else needs at least one team.
+// The hub's role -> the roles this site uses. Admin (hub admin, or the Order Analytics "Admin" role) stands alone; everyone else needs at least one team.
 // Returns null when the person has no access to Order Analytics.
 function rolesFromHub({ role, ordersRoles } = {}) {
-  if (role === 'admin') return ['admin'];
+  if (role === 'admin' || (Array.isArray(ordersRoles) && ordersRoles.includes('admin'))) return ['admin'];
   const picked = TEAM_ROLES.filter((r) => Array.isArray(ordersRoles) && ordersRoles.includes(r));
   return picked.length ? picked : null;
 }

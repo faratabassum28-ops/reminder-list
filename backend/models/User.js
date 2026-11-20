@@ -36,7 +36,12 @@ const userSchema = new mongoose.Schema(
     // Order Analytics ("orders" app): which desk team(s) this person works in. Admins see the whole dashboard and
     // need none. Everyone else needs at least one: "confirmation" (calls and confirms new orders) and/or
     // "packing" (the dispatch desk: slips, packing, handover).
-    ordersRoles: { type: [String], enum: ["confirmation", "packing"], default: [] },
+    ordersRoles: { type: [String], enum: ["confirmation", "packing", "admin"], default: [] },
+    // Certificate Studio ("certificates" app): "admin" (templates, edits, approvals) or "issuer" (issues certificates, requests changes).
+    // Hub admins are always Certificate Studio admins. No value = issuer.
+    certRole: { type: String, enum: ["admin", "issuer"], default: undefined },
+    // Light / dark preference. null = never asked: the person is asked once, on their next sign-in, and the answer follows them to every device.
+    theme: { type: String, enum: ["light", "dark"], default: null },
     // EMI Manager ("emi" app): the role inside it. Admins are EMI admins and need none. "Admin" = everything incl. users' batch
     // access and backups, "Manager" = settings, imports, discounts above the limit; "CRM" = enrol, record payments, log calls;
     // "Viewer" = read-only (Accounts can additionally be allowed to verify payments with emiCanVerify).

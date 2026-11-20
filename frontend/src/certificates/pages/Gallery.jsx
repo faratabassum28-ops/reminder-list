@@ -8,7 +8,7 @@ import Thumb from "../components/Thumb.jsx";
 import { C } from "../paths.js";
 
 export default function Gallery() {
-  const { isAdmin } = useAuth();
+  const { isCertAdmin: isAdmin } = useAuth();
   const { templates, error: loadError, reload } = useTemplates();
   const [error, setError] = useState("");
   const [q, setQ] = useState("");

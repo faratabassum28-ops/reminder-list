@@ -8,6 +8,8 @@ test('rolesFromHub: admin stands alone, members need a team, junk is dropped', (
   assert.deepEqual(H.rolesFromHub({ role: 'admin', ordersRoles: ['packing'] }), ['admin']);
   assert.deepEqual(H.rolesFromHub({ role: 'member', ordersRoles: ['packing', 'confirmation'] }), ['confirmation', 'packing']);
   assert.deepEqual(H.rolesFromHub({ role: 'member', ordersRoles: ['packing', 'bogus'] }), ['packing']);
+  assert.deepEqual(H.rolesFromHub({ role: 'member', ordersRoles: ['admin'] }), ['admin']);
+  assert.deepEqual(H.rolesFromHub({ role: 'member', ordersRoles: ['admin', 'packing'] }), ['admin']);
   assert.equal(H.rolesFromHub({ role: 'member', ordersRoles: [] }), null);
   assert.equal(H.rolesFromHub({ role: 'member' }), null);
   assert.equal(H.rolesFromHub(), null);

@@ -21,7 +21,7 @@ const greeting = () => {
 };
 
 export default function Hub() {
-  const { user, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi } = useAuth();
+  const { user, logout, isAdmin, isCertAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi } = useAuth();
   const navigate = useNavigate();
   const [wsStats, setWsStats] = useState(null);
   const [remStats, setRemStats] = useState(null);
@@ -58,6 +58,7 @@ export default function Hub() {
           <span className="hub-user-name">{user?.name}</span>
           <span className="hub-user-role">{isAdmin ? "Admin" : "Member"}</span>
         </div>
+        {isAdmin && <button type="button" className="hub-ghost" onClick={() => navigate("/admin/apps")} title="Apps, people, roles and settings for all six apps (admins only)">⚙ Admin settings</button>}
         <button type="button" className="hub-ghost" onClick={toggleTheme} aria-label="Toggle theme">
           {theme === "dark" ? "☀ Light" : "☾ Dark"}
         </button>
@@ -163,11 +164,11 @@ export default function Hub() {
             <ul className="hub-card-points">
               <li>Name &amp; date placed perfectly, every time</li>
               <li>Bulk issue as a ZIP · one certificate per student</li>
-              <li>{isAdmin ? "Approve change requests" : "Request corrections from an admin"}</li>
+              <li>{isCertAdmin ? "Approve change requests" : "Request corrections from an admin"}</li>
             </ul>
             <div className="hub-card-foot">
-              {isAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} change request{certSummary.pending === 1 ? "" : "s"} awaiting you</span>}
-              {!isAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} of your requests pending</span>}
+              {isCertAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} change request{certSummary.pending === 1 ? "" : "s"} awaiting you</span>}
+              {!isCertAdmin && certSummary?.pending > 0 && <span className="hub-pill hub-pill-alert">{certSummary.pending} of your requests pending</span>}
               {certSummary && !(certSummary.pending > 0) && <span className="hub-pill">{certSummary.issuedThisMonth} issued this month</span>}
               {!certSummary && <span className="hub-pill hub-pill-quiet">Open</span>}
             </div>

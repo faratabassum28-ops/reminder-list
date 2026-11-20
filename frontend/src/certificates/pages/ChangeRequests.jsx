@@ -20,7 +20,7 @@ function Diff({ cr }) {
 }
 
 export default function ChangeRequests() {
-  const { isAdmin } = useAuth();
+  const { isCertAdmin: isAdmin } = useAuth();
   const [status, setStatus] = useState("pending");
   const [items, setItems] = useState(null);
   const [error, setError] = useState("");

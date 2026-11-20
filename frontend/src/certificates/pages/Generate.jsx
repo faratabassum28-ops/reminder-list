@@ -18,7 +18,7 @@ const today = () => {
 
 export default function Generate() {
   const { id } = useParams();
-  const { isAdmin } = useAuth();
+  const { isCertAdmin: isAdmin } = useAuth();
   const [tpl, setTpl] = useState(null);
   const [img, setImg] = useState(null);
   const [error, setError] = useState("");
