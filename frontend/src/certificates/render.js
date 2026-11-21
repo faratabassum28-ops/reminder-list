@@ -47,11 +47,42 @@ export function loadImage(src) {
 
 const fontSpec = (f, size) => `${f.bold ? 700 : 400} ${size}px "${f.fontFamily}"`;
 
+// Downloads are always at least this many pixels on the long edge (~A4 at 340 dpi), even if the uploaded
+// template image is small. Text is drawn as vector glyphs at this size, so it stays razor sharp.
+export const EXPORT_LONG_EDGE = 4000;
+export const PREVIEW_LONG_EDGE = 1800;
+export const LOW_RES_PX = 1800; // templates below this long edge get a "upload a bigger image" warning
+
+// Upscales in 2x steps: much smoother than one big jump.
+function drawScaled(ctx, img, W, H) {
+  let cw = img.naturalWidth;
+  let ch = img.naturalHeight;
+  let src = img;
+  while (cw * 2 < W) {
+    const step = document.createElement("canvas");
+    step.width = cw * 2;
+    step.height = ch * 2;
+    const sc = step.getContext("2d");
+    sc.imageSmoothingEnabled = true;
+    sc.imageSmoothingQuality = "high";
+    sc.drawImage(src, 0, 0, step.width, step.height);
+    src = step;
+    cw = step.width;
+    ch = step.height;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, 0, 0, W, H);
+}
+
 /**
  * Draws the certificate onto `canvas`.
- * - Without opts.maxWidth the canvas is the image's full native resolution (used for downloads).
- * - With opts.maxWidth it is scaled down (used for fast on-screen previews).
- * Fonts are preloaded first so the actual drawing is synchronous and cannot interleave.
+ * - Default (downloads): canvas long edge = max(native, EXPORT_LONG_EDGE). Small templates are upscaled.
+ * - opts.maxWidth: fast on-screen preview, long edge capped at that many px (small images are upscaled to it too,
+ *   so the preview is never a stretched low-res bitmap).
+ * Field coordinates are fractions of the image, so preview and download place text identically.
+ * Vertical position y = the visual centre of capital letters (same for every font and every name),
+ * which is what the marker in the editor shows.
  */
 export async function renderCertificate(canvas, img, template, values, opts = {}) {
   const fields = template.fields.filter((f) => values[f.key]);
@@ -60,15 +91,22 @@ export async function renderCertificate(canvas, img, template, values, opts = {}
   await Promise.all(fields.map((f) => document.fonts.load(fontSpec(f, 40), values[f.key]).catch(() => null)));
   if (opts.shouldCancel && opts.shouldCancel()) return false;
 
-  const scale = opts.maxWidth ? Math.min(1, opts.maxWidth / img.naturalWidth) : 1;
-  const W = Math.round(img.naturalWidth * scale);
-  const H = Math.round(img.naturalHeight * scale);
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  const long = Math.max(nw, nh);
+  const targetLong = opts.maxWidth ? Math.min(opts.maxWidth, PREVIEW_LONG_EDGE) : Math.max(long, EXPORT_LONG_EDGE);
+  const scale = targetLong / long;
+  const W = Math.round(nw * scale);
+  const H = Math.round(nh * scale);
   canvas.width = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, 0, 0, W, H);
+  drawScaled(ctx, img, W, H);
+
+  ctx.textRendering = "geometricPrecision";
+  ctx.fontKerning = "normal";
+  ctx.textBaseline = "alphabetic";
 
   for (const f of fields) {
     const text = String(values[f.key]);
@@ -80,10 +118,11 @@ export async function renderCertificate(canvas, img, template, values, opts = {}
       size *= maxW / measured; // shrink long names so they never overflow
       ctx.font = fontSpec(f, size);
     }
+    // Name-independent vertical centring: use the height of capitals ("H") of this font, not of this text.
+    const capH = ctx.measureText("H").actualBoundingBoxAscent || size * 0.7;
     ctx.fillStyle = f.color;
     ctx.textAlign = f.align;
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, f.x * W, f.y * H);
+    ctx.fillText(text, f.x * W, f.y * H + capH / 2);
   }
   return true;
 }

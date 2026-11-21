@@ -6,14 +6,18 @@ export async function canvasToFile(canvas, format) {
     const { jsPDF } = await import("jspdf");
     const W = canvas.width;
     const H = canvas.height;
+    // Real print size: 297 mm on the long edge (A4 landscape/portrait proportions kept from the image),
+    // with the full-resolution lossless image embedded, so it prints sharp.
+    const long = 297;
+    const pw = W >= H ? long : (long * W) / H;
+    const ph = W >= H ? (long * H) / W : long;
     const pdf = new jsPDF({
       orientation: W >= H ? "landscape" : "portrait",
-      unit: "px",
-      format: [W, H],
-      hotfixes: ["px_scaling"],
+      unit: "mm",
+      format: [pw, ph],
       compress: true,
     });
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, W, H);
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pw, ph, undefined, "FAST");
     return pdf.output("blob");
   }
   return canvasToBlob(canvas, "image/png");
