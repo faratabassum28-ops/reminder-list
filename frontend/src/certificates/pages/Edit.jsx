@@ -74,8 +74,12 @@ export default function Edit() {
 
   // ----- drag markers on the preview -----
   const pointerPos = (e) => {
-    const r = wrapRef.current.getBoundingClientRect();
-    return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+    const el = wrapRef.current;
+    const r = el.getBoundingClientRect();
+    // measure inside the border so the click maps exactly onto the canvas (and the absolutely-positioned markers)
+    const x = (e.clientX - r.left - el.clientLeft) / el.clientWidth;
+    const y = (e.clientY - r.top - el.clientTop) / el.clientHeight;
+    return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
   };
   const onDown = (e) => {
     if (!img) return;

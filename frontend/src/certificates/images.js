@@ -27,7 +27,9 @@ function shrink(blob, maxW) {
       const c = document.createElement("canvas");
       c.width = Math.max(1, Math.round(img.naturalWidth * scale));
       c.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const cx = c.getContext("2d");
+      cx.imageSmoothingQuality = "high";
+      cx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       c.toBlob((b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error("thumb"))), "image/jpeg", 0.82);
     };

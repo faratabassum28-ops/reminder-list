@@ -8,7 +8,7 @@ import CertCanvas from "../components/CertCanvas.jsx";
 import ColorField from "../components/ColorField.jsx";
 import ChangeDialog from "../components/ChangeDialog.jsx";
 import { canvasToFile, parseStudentLine } from "../export.js";
-import { DATE_FORMATS, formatDate, renderCertificate, downloadBlob, safeFileName } from "../render.js";
+import { DATE_FORMATS, EXPORT_LONG_EDGE, LOW_RES_PX, formatDate, renderCertificate, downloadBlob, safeFileName } from "../render.js";
 import { C } from "../paths.js";
 
 const today = () => {
@@ -164,10 +164,17 @@ export default function Generate() {
     <div className="page cs-page">
       <PageHeader
         title={tpl.name}
-        subtitle={<>{tpl.code && <><code className="cs-code">{tpl.code}</code> · </>}Output size: {tpl.width} × {tpl.height} px</>}
+        subtitle={<>{tpl.code && <><code className="cs-code">{tpl.code}</code> · </>}Output size: {Math.round(tpl.width * Math.max(1, EXPORT_LONG_EDGE / Math.max(tpl.width, tpl.height)))} × {Math.round(tpl.height * Math.max(1, EXPORT_LONG_EDGE / Math.max(tpl.width, tpl.height)))} px</>}
         meta={isAdmin && <Link to={`${C}/t/${id}/edit`} className="cs-btn">Edit certificate</Link>}
       />
       {error && <p className="cs-error">{error}</p>}
+      {Math.max(tpl.width, tpl.height) < LOW_RES_PX && (
+        <p className="cs-warn" style={{ lineHeight: 1.5 }}>
+          This certificate's background image is only {tpl.width} × {tpl.height} px. Name, date and ID are exported sharp, but the
+          artwork itself can't get sharper than the uploaded file. For print quality, re-export the blank certificate at 3000 px or wider
+          (Canva: Share → Download → PNG, size 3×) and use Edit → Replace image.
+        </p>
+      )}
 
       <div className="cs-editor">
         <div className="cs-stage"><CertCanvas img={img} template={view} values={previewValues} /></div>

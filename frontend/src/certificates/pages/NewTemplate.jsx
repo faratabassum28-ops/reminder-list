@@ -57,7 +57,7 @@ export default function NewTemplate() {
     <div className="page cs-page">
       <PageHeader title="Upload a certificate" subtitle="Use the blank certificate: leave the name and date areas empty." />
       <form onSubmit={submit} className="cs-panel cs-narrow">
-        <p className="cs-muted">Use the highest resolution you have — downloads are exported at this image's full size.</p>
+        <p className="cs-muted">Use the highest resolution you have — downloads are exported at up to 4000 px, but the artwork can only be as sharp as the file you upload.</p>
         <label className="cs-drop">
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => pick(e.target.files[0])} hidden />
           {preview ? <img src={preview} alt="Preview" /> : <span>Click to choose an image (PNG / JPG / WEBP)</span>}
