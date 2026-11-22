@@ -440,7 +440,7 @@ export function OrderDrawer({ orderId, onClose }) {
                 {c.dq.handover && manifestPhotos(c.dq.handover).map((id, i) => <ProofImg key={id} id={id} alt={`Photo of the manifest ${i + 1}`} onOpen={(src, title) => setProof({ src, title })} />)}
               </div>
             )}
-            {data.shipway && <p className="muted">Shipway: <b>{data.shipway.status}</b>{data.shipway.carrier ? ` · ${data.shipway.carrier}` : ''}{data.shipway.awb ? ` · AWB ${data.shipway.awb}` : ''}</p>}
+            {data.shipway && <p className="muted">{(data.shipway.provider === 'shiprocket') ? 'Shiprocket' : 'Shipway'}: <b>{data.shipway.status}</b>{data.shipway.carrier ? ` · ${data.shipway.carrier}` : ''}{data.shipway.awb ? ` · AWB ${data.shipway.awb}` : ''}</p>}
 
             {(m.hasUtm || m.landingPath) && (
               <>

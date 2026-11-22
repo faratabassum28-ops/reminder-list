@@ -1,8 +1,13 @@
 // Keeps the ShipwayShipment collection fresh: one lookup per order, newest first, only where something can still change.
+// The collection holds BOTH providers' shipments (field `provider`): an order is looked up in the service the packing team chose for it
+// (DeskOrder.dq.provider, Shipway when nothing was chosen), so NDR, RTO, weight cases and the Overview need no change.
 const cfg = require('../config');
-const { Order, ShipwayShipment, Setting } = require('../models');
+const { Order, ShipwayShipment, DeskOrder, Setting } = require('../models');
 const { normalizeShipment, pickCandidates } = require('../lib/shipwayMap');
+const { fromShiprocket, normalizeShiprocket } = require('../lib/shiprocketMap');
+const P = require('../lib/providers');
 const client = require('./shipwayClient');
+const rocket = require('./shiprocketClient');
 
 const LAST_KEY = 'shipway.last';
 const STALE_MS = 30 * 60 * 1000;
@@ -12,33 +17,63 @@ const getSetting = async (k) => { const s = await Setting.findOne({ key: k }).le
 const putSetting = (k, value) => Setting.findOneAndUpdate({ key: k }, { key: k, value }, { upsert: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Ask Shipway about one order and save the answer (keeps the list of status changes it has seen).
-async function refreshOne(orderId) {
+const configured = (provider) => (provider === 'shiprocket' ? rocket.isConfigured() : client.isConfigured());
+const anyConfigured = () => client.isConfigured() || rocket.isConfigured();
+const NOT_SET = { shipway: 'Shipway is not set up yet.', shiprocket: 'Shiprocket is not set up yet.' };
+
+// Which provider holds this order? Only orders the packing team put through the slip step can be Shiprocket.
+async function providerFor(orderId) {
+  const d = await DeskOrder.findOne({ orderId }).select('dq.provider').lean();
+  return P.providerOf(d);
+}
+async function shiprocketIds(orderIds) {
+  const docs = await DeskOrder.find({ orderId: { $in: orderIds }, 'dq.provider.name': 'shiprocket' }).select('orderId').lean();
+  return new Set(docs.map((d) => d.orderId));
+}
+
+// Ask the right provider about one order -> { found, id, doc } | { found: false, message }
+async function lookup(orderId, provider) {
+  if (provider === 'shiprocket') {
+    const r = await rocket.getOrderShipment(orderId);
+    if (!r.found) return r;
+    const shaped = fromShiprocket(r.response.order, r.response.track);
+    if (!shaped) return { found: false, message: 'In Shiprocket, but not dispatched yet (no AWB)' };
+    return { found: true, id: r.id, doc: normalizeShiprocket(shaped, r.id) };
+  }
+  const r = await client.getOrderShipmentDetails(orderId);
+  if (!r.found) return r;
+  return { found: true, id: r.id, doc: { ...normalizeShipment(r.response, r.id), provider: 'shipway' } };
+}
+
+// Ask the provider about one order and save the answer (keeps the list of status changes it has seen).
+async function refreshOne(orderId, provider) {
+  provider = provider || (await providerFor(orderId));
   const prev = await ShipwayShipment.findOne({ orderId }).lean();
   const now = new Date();
   let r;
-  try { r = await client.getOrderShipmentDetails(orderId); } catch (e) {
-    if (e.code === 'auth' || e.code === 'not_configured') throw e; // nothing else will work either
+  try { r = await lookup(orderId, provider); } catch (e) {
+    if (e.code === 'auth' || e.code === 'not_configured') { e.provider = provider; throw e; } // nothing else will work for this provider either
     await ShipwayShipment.updateOne({ orderId }, { $set: { checkedAt: now, error: e.message }, $setOnInsert: { orderId, found: false } }, { upsert: true });
     return { orderId, error: e.message };
   }
   if (!r.found) {
     // Never wipe a status we already have because of a lookup that came back empty.
-    if (prev && prev.found) { await ShipwayShipment.updateOne({ orderId }, { $set: { checkedAt: now, error: '' } }); return { orderId, kept: true }; }
-    await ShipwayShipment.updateOne({ orderId }, { $set: { found: false, checkedAt: now, error: '' }, $setOnInsert: { orderId } }, { upsert: true });
+    // (only a status from the SAME provider: a record left by the other service must not stand in for this one)
+    if (prev && prev.found && (prev.provider || 'shipway') === provider) { await ShipwayShipment.updateOne({ orderId }, { $set: { checkedAt: now, error: '' } }); return { orderId, kept: true }; }
+    await ShipwayShipment.updateOne({ orderId }, { $set: { found: false, provider, checkedAt: now, error: '' }, $setOnInsert: { orderId } }, { upsert: true });
     return { orderId, found: false };
   }
-  const d = normalizeShipment(r.response, r.id);
-  const changed = !prev || prev.statusCode !== d.statusCode || prev.status !== d.status;
+  const d = r.doc;
+  const changed = !prev || prev.statusCode !== d.statusCode || prev.status !== d.status || prev.provider !== d.provider;
   const history = changed ? [...((prev && prev.history) || []), { code: d.statusCode, status: d.status, at: d.statusAt || now }].slice(-30) : prev.history;
-  await ShipwayShipment.updateOne({ orderId }, { $set: { ...d, history, checkedAt: now, error: '', ...(changed ? { changedAt: now } : {}) }, $setOnInsert: { orderId } }, { upsert: true });
+  await ShipwayShipment.updateOne({ orderId }, { $set: { ...d, history, checkedAt: now, error: '', ...(changed ? { changedAt: now } : {}) } , $setOnInsert: { orderId } }, { upsert: true });
   return { orderId, found: true, changed };
 }
 
 // limit: how many orders to look up in this run (the timer uses a small batch, the button a big one).
 async function run({ limit = 300, all = false } = {}) {
-  if (!client.isConfigured()) throw Object.assign(new Error('Shipway is not set up yet.'), { status: 400 });
-  if (isRunning()) throw Object.assign(new Error('A Shipway sync is already running'), { status: 409 });
+  if (!anyConfigured()) throw Object.assign(new Error('Neither Shipway nor Shiprocket is set up yet.'), { status: 400 });
+  if (isRunning()) throw Object.assign(new Error('A Shipway / Shiprocket sync is already running'), { status: 409 });
   state.runningSince = Date.now(); state.progress = 0; state.total = 0;
   let checked = 0; let found = 0; let changed = 0; let missing = 0; let failed = 0;
   try {
@@ -46,25 +81,29 @@ async function run({ limit = 300, all = false } = {}) {
       Order.find({ excluded: null, orderId: { $ne: null } }).select('orderId orderDate').sort({ orderDate: -1, orderId: -1 }).lean(),
       ShipwayShipment.find().select('orderId found final error checkedAt').lean(),
     ]);
-    const ids = pickCandidates(orders, new Map(docs.map((d) => [d.orderId, d])), new Date(), { limit: all ? 100000 : limit });
-    state.total = ids.length;
-    const queue = [...ids];
-    let authErr = null;
+    const picked = pickCandidates(orders, new Map(docs.map((d) => [d.orderId, d])), new Date(), { limit: all ? 100000 : limit });
+    const rocketSet = await shiprocketIds(picked);
+    const work = picked.map((id) => ({ id, provider: rocketSet.has(id) ? 'shiprocket' : 'shipway' })).filter((w) => configured(w.provider));
+    state.total = work.length;
+    const queue = [...work];
+    const dead = new Map(); // provider -> its login error: that provider stops, the other keeps going
     const worker = async () => {
-      while (queue.length && !authErr) {
-        const id = queue.shift();
+      while (queue.length) {
+        const w = queue.shift();
+        if (dead.has(w.provider)) continue;
         try {
-          const r = await refreshOne(id);
+          const r = await refreshOne(w.id, w.provider);
           checked++; if (r.error) failed++; else if (r.found) { found++; if (r.changed) changed++; } else if (!r.kept) missing++;
-        } catch (e) { authErr = e; }
+        } catch (e) { dead.set(w.provider, e); }
         state.progress = checked;
-        await sleep(120); // be gentle with Shipway
+        await sleep(120); // be gentle with the providers
       }
     };
     await Promise.all([worker(), worker(), worker()]);
-    if (authErr) throw authErr;
-    await putSetting(LAST_KEY, { at: new Date(), ok: true, checked, found, changed, missing, failed });
-    return { checked, found, changed, missing, failed };
+    if (dead.size && !checked) throw [...dead.values()][0];
+    const loginProblems = [...dead.entries()].map(([p, e]) => `${P.labelOf(p)}: ${e.message}`);
+    await putSetting(LAST_KEY, { at: new Date(), ok: !dead.size, checked, found, changed, missing, failed, ...(loginProblems.length ? { error: loginProblems.join(' | ') } : {}) });
+    return { checked, found, changed, missing, failed, loginProblems };
   } catch (e) {
     await putSetting(LAST_KEY, { at: new Date(), ok: false, checked, error: e.message }).catch(() => {});
     throw e;
@@ -74,26 +113,31 @@ async function run({ limit = 300, all = false } = {}) {
 // For the order drawer: a fresh look at one order if the saved answer is old (moving shipments) or missing.
 const tried = new Map();
 async function ensureFresh(orderId, maxAgeMin = 10) {
-  if (!client.isConfigured() || !Number.isFinite(orderId)) return ShipwayShipment.findOne({ orderId }).lean();
+  const provider = Number.isFinite(orderId) ? await providerFor(orderId) : 'shipway';
+  if (!configured(provider) || !Number.isFinite(orderId)) return ShipwayShipment.findOne({ orderId }).lean();
   const have = await ShipwayShipment.findOne({ orderId }).lean();
   const stale = !have || (!have.final && Date.now() - new Date(have.checkedAt) > maxAgeMin * 60000);
   if (stale && Date.now() - (tried.get(orderId) || 0) > 2 * 60000) {
     tried.set(orderId, Date.now());
-    try { await refreshOne(orderId); } catch (e) { return have || null; }
+    try { await refreshOne(orderId, provider); } catch (e) { return have || null; }
     return ShipwayShipment.findOne({ orderId }).lean();
   }
   return have;
 }
 
 async function status() {
-  const [last, count, byGroup] = await Promise.all([
+  const [last, count, byGroup, byProvider] = await Promise.all([
     getSetting(LAST_KEY),
     ShipwayShipment.countDocuments({ found: true }),
     ShipwayShipment.aggregate([{ $match: { found: true } }, { $group: { _id: '$group', n: { $sum: 1 } } }]),
+    ShipwayShipment.aggregate([{ $match: { found: true } }, { $group: { _id: '$provider', n: { $sum: 1 } } }]),
   ]);
+  const per = Object.fromEntries(byProvider.map((g) => [g._id || 'shipway', g.n]));
   return {
     configured: client.isConfigured(), username: cfg.shipway.username, intervalMin: cfg.shipway.syncIntervalMin, idFormat: cfg.shipway.orderIdFormat,
     running: isRunning(), progress: state.progress, total: state.total, last, tracked: count, byGroup: Object.fromEntries(byGroup.map((g) => [g._id || 'other', g.n])),
+    shipway: { configured: client.isConfigured(), tracked: per.shipway || 0 },
+    shiprocket: { configured: rocket.isConfigured(), email: cfg.shiprocket.email, mock: rocket.isMock(), tracked: per.shiprocket || 0, intervalMin: cfg.shiprocket.syncIntervalMin },
   };
 }
 
@@ -108,7 +152,7 @@ async function test() {
     if (r.found) { const d = normalizeShipment(r.response, r.id); sample = { orderId: o.orderId, shipwayOrderId: r.id, status: d.status, code: d.statusCode, carrier: d.carrier, awb: d.awb, weightKeys: d.weightKeys }; break; }
   }
   if (!sample) { // the newest orders may simply not be dispatched yet: try orders Shipway already knows
-    const known = await ShipwayShipment.find({ found: true }).select('orderId').sort({ checkedAt: -1 }).limit(8).lean();
+    const known = await ShipwayShipment.find({ found: true, provider: { $ne: 'shiprocket' } }).select('orderId').sort({ checkedAt: -1 }).limit(8).lean();
     for (const k of known) {
       const r = await client.getOrderShipmentDetails(k.orderId);
       if (r.found) { const d = normalizeShipment(r.response, r.id); sample = { orderId: k.orderId, shipwayOrderId: r.id, status: d.status, code: d.statusCode, carrier: d.carrier, awb: d.awb, weightKeys: d.weightKeys }; break; }
@@ -118,13 +162,28 @@ async function test() {
   return { ok: problems.length === 0, sample, problems };
 }
 
-function start() {
-  if (!client.isConfigured()) { console.log('[shipway] not configured (SHIPWAY_USERNAME / SHIPWAY_LICENSE_KEY): skipped'); return; }
-  const every = cfg.shipway.syncIntervalMin;
-  const tick = () => run({ limit: 300 }).catch((e) => { if (e.status !== 409) console.warn('[shipway] sync failed:', e.message); });
-  setTimeout(tick, 20000);
-  if (every > 0) setInterval(tick, every * 60 * 1000);
-  console.log(`[shipway] connected as ${cfg.shipway.username}${every > 0 ? `, refreshing every ${every} min` : ''}`);
+// Same check for Shiprocket: the API-user login, then one real lookup among orders the team put through Shiprocket (else the newest orders).
+async function testShiprocket() {
+  const problems = [];
+  await rocket.authenticate();
+  const mine = await DeskOrder.find({ 'dq.provider.name': 'shiprocket' }).select('orderId').sort({ updatedAt: -1 }).limit(8).lean();
+  const recent = mine.length ? mine : await Order.find({ excluded: null, orderId: { $ne: null } }).select('orderId').sort({ orderDate: -1, orderId: -1 }).limit(8).lean();
+  let sample = null;
+  for (const o of recent) {
+    const r = await lookup(o.orderId, 'shiprocket');
+    if (r.found) { const d = r.doc; sample = { orderId: o.orderId, shipwayOrderId: r.id, status: d.status, code: d.statusCode, carrier: d.carrier, awb: d.awb, weightKeys: d.weightKeys }; break; }
+  }
+  if (!sample && recent.length) problems.push(`Login works, but Shiprocket has no shipment with an AWB for ${mine.length ? 'the orders marked Shiprocket' : 'the newest orders'} (${recent.map((o) => o.orderId).join(', ')}). Either no AWB was created yet, or Shiprocket holds them under a different order number (it must match the Shopify order number).`);
+  return { ok: problems.length === 0, sample, problems };
 }
 
-module.exports = { run, refreshOne, ensureFresh, status, test, start };
+function start() {
+  if (!anyConfigured()) { console.log('[shipway/shiprocket] neither is configured (SHIPWAY_USERNAME / SHIPWAY_LICENSE_KEY, SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD): skipped'); return; }
+  const every = Math.min(...[cfg.shipway.syncIntervalMin, cfg.shiprocket.syncIntervalMin].filter((n) => n > 0), Infinity);
+  const tick = () => run({ limit: 300 }).catch((e) => { if (e.status !== 409) console.warn('[shipway/shiprocket] sync failed:', e.message); });
+  setTimeout(tick, 20000);
+  if (Number.isFinite(every)) setInterval(tick, every * 60 * 1000);
+  console.log(`[tracking] ${client.isConfigured() ? `Shipway as ${cfg.shipway.username}` : 'Shipway off'}, ${rocket.isConfigured() ? `Shiprocket as ${cfg.shiprocket.email || 'mock'}` : 'Shiprocket off'}${Number.isFinite(every) ? `, refreshing every ${every} min` : ''}`);
+}
+
+module.exports = { run, refreshOne, ensureFresh, status, test, testShiprocket, start, providerFor, lookup };

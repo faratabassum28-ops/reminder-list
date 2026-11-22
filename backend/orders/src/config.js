@@ -39,6 +39,15 @@ module.exports = {
     // How often to refresh tracking status (0 = only by button).
     syncIntervalMin: env.SHIPWAY_SYNC_INTERVAL_MIN === undefined || env.SHIPWAY_SYNC_INTERVAL_MIN === '' ? 10 : Math.max(0, Number(env.SHIPWAY_SYNC_INTERVAL_MIN) || 0),
   },
+  // Shiprocket (second dispatch and tracking provider, next to Shipway). Create an API user in Shiprocket > Settings > API > Add New API User
+  // and use THAT email and password here (it must be different from the main Shiprocket login).
+  shiprocket: {
+    email: (env.SHIPROCKET_EMAIL || '').trim(),
+    password: (env.SHIPROCKET_PASSWORD || '').trim(),
+    apiBase: (env.SHIPROCKET_API_BASE || 'https://apiv2.shiprocket.in').trim().replace(/\/+$/, ''),
+    // How often to refresh tracking status (0 = only by button). Shipway and Shiprocket orders share one timer.
+    syncIntervalMin: env.SHIPROCKET_SYNC_INTERVAL_MIN === undefined || env.SHIPROCKET_SYNC_INTERVAL_MIN === '' ? 10 : Math.max(0, Number(env.SHIPROCKET_SYNC_INTERVAL_MIN) || 0),
+  },
   // Confirm Queue / Dispatch Desk. Proof video is built into the data model but off until switched on (FLOW_VIDEO_ENABLED=1).
   flow: { videoEnabled: env.FLOW_VIDEO_ENABLED === '1' },
   // Public address of the hub's backend, which now serves Order Analytics too (used for the Shopify redirect URL). Render sets RENDER_EXTERNAL_URL by itself.

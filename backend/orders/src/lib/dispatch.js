@@ -5,6 +5,7 @@
 //   handover  Order handed to courier -> form: photo of the manifest; the order then leaves the queue (stage 'dispatched' = In-transit orders)
 // The service (services/deskService.js) stores what these functions return.
 const { istParts, istToDate, startOfDay, fmtDate, parseYmd, DAY } = require('./istTime');
+const PR = require('./providers');
 
 const STEPS = ['slip', 'packed', 'handover'];
 const STEP_LABEL = { slip: 'Packing slip', packed: 'Order packed', handover: 'Order handover' };
@@ -122,11 +123,20 @@ const wrongStep = (doc, want) => {
 const base = (doc, who, now) => ({ at: now, by: who.name, byId: who.id, stage: 'dispatch', fu: '' });
 const timing = (doc, conf, now) => { const due = dueAt(doc, conf); return { dueAt: due, late: !!due && now.getTime() > due.getTime() }; };
 
-function slipDone(doc, conf, who = { id: 'system', name: 'System' }, now = new Date()) {
+// input: { provider } = which service books this order, Shipway or Shiprocket. The packing team picks it when marking the slip done.
+// Left out only by old callers that predate Shiprocket (then nothing is stored and the order counts as Shipway); the service always asks.
+function cleanProvider(raw) {
+  const p = PR.norm(raw);
+  if (!p) throw httpErr(400, 'Choose where this order ships from: Shipway or Shiprocket');
+  return p;
+}
+
+function slipDone(doc, conf, who = { id: 'system', name: 'System' }, now = new Date(), input) {
   if (stepOf(doc) !== 'slip' || isHeld(doc)) throw wrongStep(doc, 'slip');
   const t = timing(doc, conf, now);
-  const dq = { ...(doc.dq || {}), step: 'packed', stepAt: now, slip: { at: now, byName: who.name, byId: who.id, ...t } };
-  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'slip_done', label: `Packing slip done${t.late ? ' (late)' : ''}` }] };
+  const provider = input === undefined ? null : cleanProvider(input.provider);
+  const dq = { ...(doc.dq || {}), step: 'packed', stepAt: now, slip: { at: now, byName: who.name, byId: who.id, ...t }, ...(provider ? { provider: { name: provider, at: now, byName: who.name, byId: who.id } } : {}) };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'slip_done', label: `Packing slip done${provider ? ` · ${PR.labelOf(provider)}` : ''}${t.late ? ' (late)' : ''}` }] };
 }
 
 // "Letters, digits and - _ /" only, 5 to 40 long. Upper-cased so the same AWB typed twice always matches.
@@ -162,10 +172,11 @@ function handoverDone(doc, input = {}, conf, who = { id: 'system', name: 'System
   const courier = String(input.courier || packed.courier || '').trim().slice(0, 60);
   const t = timing(doc, conf, now);
   const dq = { ...(doc.dq || {}), step: 'done', stepAt: now, handover: { at: now, byName: who.name, byId: who.id, manifestId: manifestIds[0] || null, manifestIds, manifestRef: manifestOf(doc) || null, ...t } };
+  const provider = PR.providerOf(doc);
   return {
-    set: { stage: 'dispatched', dq, dispatch: { at: now, byName: who.name, awb: packed.awb || '', courier, note: '' } },
+    set: { stage: 'dispatched', dq, dispatch: { at: now, byName: who.name, awb: packed.awb || '', courier, note: '', provider } },
     // action "dispatch" on purpose: the Overview's per-person "dispatched" count reads it
-    entries: [{ ...base(doc, who, now), action: 'dispatch', label: `Handed over to courier${courier ? ` (${courier})` : ''}${packed.awb ? ` · AWB ${packed.awb}` : ''}${t.late ? ' (late)' : ''}` }],
+    entries: [{ ...base(doc, who, now), action: 'dispatch', label: `Handed over to courier${courier ? ` (${courier})` : ''} via ${PR.labelOf(provider)}${packed.awb ? ` · AWB ${packed.awb}` : ''}${t.late ? ' (late)' : ''}` }],
   };
 }
 
@@ -183,16 +194,18 @@ function manifestAssigned(doc, input = {}, who = { id: 'system', name: 'System' 
   if (!id) throw httpErr(400, 'Shipway sent no manifest id');
   if (manifestOf(doc)) throw httpErr(409, `Order #${doc.orderId} is already on manifest ${manifestOf(doc)}.`);
   const courier = String(input.courier || '').trim().slice(0, 60);
-  const dq = { ...(doc.dq || {}), manifest: { id, courier, at: now, byName: who.name, byId: who.id }, manifestError: null };
-  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'manifest', label: `Added to manifest ${id}${courier ? ` (${courier})` : ''}` }] };
+  const provider = PR.providerOf(doc); // a manifest always belongs to the order's own provider
+  const url = /^https?:\/\//i.test(String(input.url || '')) ? String(input.url).slice(0, 500) : '';
+  const dq = { ...(doc.dq || {}), manifest: { id, courier, provider, url, at: now, byName: who.name, byId: who.id }, manifestError: null };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'manifest', label: `Added to ${PR.labelOf(provider)} manifest ${id}${courier ? ` (${courier})` : ''}` }] };
 }
 
 function manifestRejected(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
   if (stepOf(doc) !== 'handover' || isHeld(doc)) throw wrongStep(doc, 'handover');
-  const message = String(input.reason || 'Shipway rejected this order').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const message = String(input.reason || `${PR.labelOf(PR.providerOf(doc))} rejected this order`).replace(/\s+/g, ' ').trim().slice(0, 300);
   const courier = String(input.courier || '').trim().slice(0, 60);
   const dq = { ...(doc.dq || {}), manifestError: { message, courier, at: now, byName: who.name } };
-  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'manifest_rejected', label: `Shipway rejected it for a manifest · ${message}` }] };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'manifest_rejected', label: `${PR.labelOf(PR.providerOf(doc))} rejected it for a manifest · ${message}` }] };
 }
 
 // Groups the handover column by manifest id. cards: board cards (with dq.manifest). -> { groups: [{ manifestId, courier, at, byName, orders }], loose: [cards without a manifest] }
@@ -201,16 +214,17 @@ function groupByManifest(cards) {
   for (const c of cards) {
     const m = c.dq && c.dq.manifest;
     if (!m || !m.id) { loose.push(c); continue; }
-    if (!groups.has(m.id)) groups.set(m.id, { manifestId: m.id, courier: m.courier || '', at: m.at || null, byName: m.byName || '', orders: [] });
+    if (!groups.has(m.id)) groups.set(m.id, { manifestId: m.id, courier: m.courier || '', provider: PR.norm(m.provider) || PR.norm(typeof (c.dq && c.dq.provider) === 'string' ? c.dq.provider : c.dq && c.dq.provider && c.dq.provider.name) || PR.DEFAULT_PROVIDER, url: m.url || '', at: m.at || null, byName: m.byName || '', orders: [] });
     groups.get(m.id).orders.push(c);
   }
   return { groups: [...groups.values()].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)), loose };
 }
 // Which couriers can get a manifest now: [{ courier, count }]. Orders without a courier name cannot be put on a manifest.
-function manifestCouriers(docs) {
+function manifestCouriers(docs, provider) {
   const m = new Map();
   for (const d of docs) {
     if (!eligibleForManifest(d)) continue;
+    if (provider && PR.providerOf(d) !== provider) continue; // each provider makes its own manifests
     const c = String((d.dq && d.dq.packed && d.dq.packed.courier) || '').trim();
     if (!c) continue;
     const k = c.toLowerCase(); const cur = m.get(k) || { courier: c, count: 0, orders: [] };
@@ -250,11 +264,12 @@ function resumeOrder(doc, input = {}, who = { id: 'system', name: 'System' }, no
 // ------------------------------------------------------------------------------------------------ numbers for the tab bar and the board
 // docs: DeskOrder rows in stage 'dispatch'. Returns { slip, packed, handover, overdue, overdueBy: {slip, packed, handover} }
 function stepCounts(docs, conf, now = new Date()) {
-  const out = { slip: 0, packed: 0, handover: 0, hold: 0, overdue: 0, overdueBy: { slip: 0, packed: 0, handover: 0 } };
+  const out = { slip: 0, packed: 0, handover: 0, hold: 0, overdue: 0, overdueBy: { slip: 0, packed: 0, handover: 0 }, byProvider: { shipway: { packed: 0, handover: 0 }, shiprocket: { packed: 0, handover: 0 } } };
   for (const d of docs) {
     const step = stepOf(d); if (!step) continue;
     if (isHeld(d)) { out.hold++; continue; } // on hold: not in a column, never overdue
     out[step]++;
+    if (step !== 'slip') out.byProvider[PR.providerOf(d)][step]++;
     const due = dueAt(d, conf);
     if (due && due.getTime() < now.getTime()) { out.overdue++; out.overdueBy[step]++; }
   }
@@ -268,5 +283,5 @@ module.exports = {
   STEPS, STEP_LABEL, MAX_HANDOVER_BATCH, MAX_PHOTOS, DEFAULT_DISPATCH_CONFIG, httpErr, idsOf,
   normaliseDispatchConfig, isWorkingDay, nextWorkingDay, dueFor, stepOf, stepStart, dueAt,
   manifestOf, manifestError, eligibleForManifest, sameCourier, manifestAssigned, manifestRejected, groupByManifest, manifestCouriers,
-  slipDone, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
+  slipDone, cleanProvider, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
 };

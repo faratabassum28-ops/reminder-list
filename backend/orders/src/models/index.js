@@ -68,7 +68,9 @@ const ShopifyOrder = conn.model('ShopifyOrder', new Schema({
 const ShipwayShipment = conn.model('ShipwayShipment', new Schema({
   orderId: { type: Number, unique: true },
   found: Boolean, // false = Shipway has no shipment under this order number (yet)
-  shipwayOrderId: String, // the id format that matched ("1874" or "#1874")
+  provider: { type: String, enum: ['shipway', 'shiprocket'], default: 'shipway', index: true }, // which service booked and tracks this shipment
+  shipmentId: String, // Shiprocket only: the shipment id a manifest is made from
+  shipwayOrderId: String, // the id format that matched ("1874" or "#1874"); for Shiprocket, the channel order id
   statusCode: String, status: String, group: { type: String, index: true }, final: Boolean,
   carrier: String, awb: String, from: String, to: String,
   pickupDate: String, statusTime: String, statusAt: Date,
@@ -195,10 +197,11 @@ const deskOrderSchema = new Schema({
   dq: {
     step: String, // slip | packed | handover | done
     stepAt: Date, // when the current step began: its deadline is counted from here
+    provider: { name: { type: String, enum: ['shipway', 'shiprocket'] }, at: Date, byName: String, byId: String }, // chosen when the packing slip is marked done: which service books and manifests this order
     slip: { at: Date, byName: String, byId: String, dueAt: Date, late: Boolean },
     packed: { at: Date, byName: String, byId: String, awb: String, courier: String, photoId: String, photoIds: [String], dueAt: Date, late: Boolean }, // photoIds: every photo of the package (photoId = the first)
     handover: { at: Date, byName: String, byId: String, manifestId: String, manifestIds: [String], manifestRef: String, dueAt: Date, late: Boolean }, // manifestIds: every photo of the manifest
-    manifest: { id: String, courier: String, at: Date, byName: String, byId: String }, // the Shipway manifest this order was put on (we create it; Shipway cannot list it back)
+    manifest: { id: String, courier: String, provider: String, url: String, at: Date, byName: String, byId: String }, // the Shipway / Shiprocket manifest this order was put on (we create it; Shipway cannot list it back)
     manifestError: { message: String, courier: String, at: Date, byName: String }, // Shipway refused this order for a manifest: why; cleared when a manifest later accepts it
     hold: { at: Date, byName: String, byId: String, note: String, step: String }, // set while the order is on hold (deadline paused); cleared on resume or cancel
   },

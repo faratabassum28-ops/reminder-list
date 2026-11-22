@@ -6,13 +6,14 @@ import { Sheet, useToast } from '../../deskUi.jsx';
 import { duration, fmtWhen, useAutoRefresh } from '../../flowUi.js';
 import { inr } from '../../format.js';
 import { can, useStaff } from '../../staff.jsx';
+import { PROVIDERS, ProviderBadge, providerLabel } from '../../providers.jsx';
 import { AssigneeRow, Empty, MultiPhotoField, OrderDrawer, PayTag, WhoFilter, Workload, notifyDesk, peopleFor, useAssign, useClock, useDebounced, useLabels, useTeam } from './shared.jsx';
 
 // The three columns of the Dispatch queue, left to right. "done" is the button label on the card.
 const COLS = [
-  { key: 'slip', label: 'stepSlip', hint: () => 'Print the slip and stick it on the box.' },
-  { key: 'packed', label: 'stepPacked', hint: (L) => `Pack the box. ${L('btnDone')} asks for photos of the package. The AWB comes from Shipway.` },
-  { key: 'handover', label: 'stepHandover', hint: (L) => `Create a manifest per courier, then hand over each manifest group with one photo.` },
+  { key: 'slip', label: 'stepSlip', hint: (L) => `Print the slip and stick it on the box. ${L('btnDone')} asks whether it ships from Shipway or Shiprocket.` },
+  { key: 'packed', label: 'stepPacked', hint: (L) => `Pack the box. The AWB comes from the service you chose at the slip (Shipway or Shiprocket).` },
+  { key: 'handover', label: 'stepHandover', hint: (L) => `Two parts: Shipway orders and Shiprocket orders. Create a manifest per courier in each, then hand over each manifest group with one photo.` },
 ];
 const hm = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 const whenLabel = (conf) => (conf.dayOffset === 0 ? `Working day ${hm(conf.dueTime)}` : `${conf.dayOffset} working day${conf.dayOffset === 1 ? '' : 's'} later, ${hm(conf.dueTime)}`);
@@ -31,20 +32,21 @@ function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone
   const late = o.dq.dueAt && new Date(o.dq.dueAt).getTime() < now + offset;
   const awb = col.key === 'packed' ? o.dq.suggestedAwb : col.key === 'handover' && o.dq.packed ? o.dq.packed.awb : '';
   const courier = col.key === 'packed' ? o.dq.suggestedCourier : col.key === 'handover' && o.dq.packed ? o.dq.packed.courier : '';
+  const prov = col.key !== 'slip' ? o.dq.provider : null; // chosen when the slip was marked done
   return (
-    <article className={`sd-card dispatch dq-card ${late ? 'late' : ''}`} aria-label={`${o.orderName}, ${title}`}>
+    <article className={`sd-card dispatch dq-card ${late ? 'late' : ''} ${prov ? `prov-${prov}` : ''}`} aria-label={`${o.orderName}, ${title}${prov ? `, ${providerLabel(prov)}` : ''}`}>
       <header>
         <div className="sd-id">
           {col.key === 'handover' && canAct && <input type="checkbox" className="dq-pick" checked={picked} onChange={() => onPick(o.orderId)} aria-label={`Select ${o.orderName} for the manifest`} />}
           <button className="link" onClick={() => onOpen(o.orderId)}>{o.orderName}</button>
-          <PayTag o={o} />{o.partial && <span className="sd-pay part">{L('payPartial')}</span>}
+          <PayTag o={o} />{o.partial && <span className="sd-pay part">{L('payPartial')}</span>}<ProviderBadge provider={prov} />
         </div>
         <Due dueAt={o.dq.dueAt} now={now} offset={offset} />
       </header>
       <div className="sd-who"><b>{o.name || 'No name'}</b>{o.city ? <span className="muted"> · {o.city}</span> : null}</div>
       <div className="sd-line"><span className="sd-amt">{inr(o.total)}</span><span className="sd-items" title={o.items}>{o.items || 'Items not loaded'}</span></div>
-      {col.key !== 'slip' && (awb ? <div className="sd-foot"><span>AWB <b>{awb}</b>{courier ? ` · ${courier}` : ''}</span></div> : <div className="sd-foot warn"><span>AWB not in Shipway yet</span></div>)}
-      {col.key === 'handover' && o.dq.manifestError && <div className="sd-foot warn" role="alert"><span>Shipway rejected it for the manifest: <b>{o.dq.manifestError.message}</b></span></div>}
+      {col.key !== 'slip' && (awb ? <div className="sd-foot"><span>AWB <b>{awb}</b>{courier ? ` · ${courier}` : ''}</span></div> : <div className="sd-foot warn"><span>AWB not in {providerLabel(prov || 'shipway')} yet</span></div>)}
+      {col.key === 'handover' && o.dq.manifestError && <div className="sd-foot warn" role="alert"><span>{providerLabel(prov || 'shipway')} rejected it for the manifest: <b>{o.dq.manifestError.message}</b></span></div>}
       {o.collect > 0 && Math.round(o.collect) !== Math.round(o.total || 0) && <div className="sd-foot"><span className="sd-collect-tag">Collect {inr(o.collect)}</span></div>}
       {(assign || canAct) && (
         <div className="dq-row">
@@ -68,9 +70,9 @@ function HeldCard({ o, now, offset, canAct, busy, onResume, onCancel, onOpen }) 
   const h = o.dq.hold;
   const ms = now + offset - new Date(h.at).getTime();
   return (
-    <article className="sd-card dispatch dq-card held" aria-label={`${o.orderName}, on hold`}>
+    <article className={`sd-card dispatch dq-card held ${o.dq.provider ? `prov-${o.dq.provider}` : ''}`} aria-label={`${o.orderName}, on hold`}>
       <header>
-        <div className="sd-id"><button className="link" onClick={() => onOpen(o.orderId)}>{o.orderName}</button><PayTag o={o} />{o.partial && <span className="sd-pay part">{L('payPartial')}</span>}</div>
+        <div className="sd-id"><button className="link" onClick={() => onOpen(o.orderId)}>{o.orderName}</button><PayTag o={o} />{o.partial && <span className="sd-pay part">{L('payPartial')}</span>}<ProviderBadge provider={o.dq.provider} /></div>
         <span className="sd-due wait" title={`On hold since ${fmtWhen(h.at)}`}>On hold {duration(Math.max(0, ms))}</span>
       </header>
       <div className="sd-who"><b>{o.name || 'No name'}</b>{o.city ? <span className="muted"> · {o.city}</span> : null}</div>
@@ -149,15 +151,42 @@ function CancelSheet({ order: o, reasons, show, onClose, onDone }) {
 }
 
 // ---------------------------------------------------------------- forms
+// Packing slip DONE: the team says which service this order ships from. It cannot be skipped: the server refuses a slip without it.
+function ProviderSheet({ order: o, show, onClose, onDone }) {
+  const { L } = useLabels();
+  const [busy, setBusy] = useState('');
+  const choose = async (provider) => {
+    setBusy(provider);
+    try { await api.post(`/desk/dispatch/${o.orderId}/slip`, { provider }); notifyDesk(); show(`${o.orderName}: packing slip done · ${providerLabel(provider)}. It is now in ${L('stepPacked')}.`); onDone(); }
+    catch (e) { show(e.message, 'err'); if (e.status === 409) onDone(); } finally { setBusy(''); }
+  };
+  return (
+    <Sheet title={`${L('stepSlip')} done · ${o.orderName}`} onClose={onClose}>
+      <p className="muted">{o.name || 'No name'} · {inr(o.total)}</p>
+      <p className="sd-q">Is this order shipping from Shipway or Shiprocket?</p>
+      <div className="prov-pick" role="group" aria-label="Shipping service">
+        {PROVIDERS.map((p) => (
+          <button key={p} className={p} disabled={!!busy} onClick={() => choose(p)}>
+            <b>{busy === p ? 'Saving…' : providerLabel(p)}</b>
+            <small>{p === 'shipway' ? 'AWB, manifest and tracking from Shipway' : 'AWB, manifest and tracking from Shiprocket'}</small>
+          </button>
+        ))}
+      </div>
+      <p className="muted">Your choice is shown on the card from here on. It decides where the AWB is read from, where the manifest is made, and which half of {L('stepHandover')} the order lands in.</p>
+    </Sheet>
+  );
+}
+
 // Order packed: the AWB and courier are read from Shipway and shown, not typed. No photos are needed.
 function PackedSheet({ order: o, conf, show, onClose, onDone }) {
   const { L } = useLabels();
+  const pl = providerLabel(o.dq.provider || 'shipway');
   const [live, setLive] = useState({ awb: o.dq.suggestedAwb || '', courier: o.dq.suggestedCourier || '', looking: true, allowManual: !!conf.allowManualAwb, shipwayConfigured: true });
   const [manual, setManual] = useState('');
   const [busy, setBusy] = useState(false);
   const look = async () => { // ask Shipway again right now: the label may have been made a minute ago
     setLive((x) => ({ ...x, looking: true }));
-    try { const r = await api.get(`/desk/dispatch/${o.orderId}/awb`); setLive({ awb: r.awb || '', courier: r.courier || '', looking: false, allowManual: r.allowManual, shipwayConfigured: r.shipwayConfigured }); }
+    try { const r = await api.get(`/desk/dispatch/${o.orderId}/awb`); setLive({ awb: r.awb || '', courier: r.courier || '', looking: false, allowManual: r.allowManual, shipwayConfigured: r.configured !== undefined ? r.configured : r.shipwayConfigured }); }
     catch { setLive((x) => ({ ...x, looking: false })); }
   };
   useEffect(() => { look(); }, [o.orderId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -174,17 +203,17 @@ function PackedSheet({ order: o, conf, show, onClose, onDone }) {
   const ready = awb.replace(/\s/g, '').length >= 5;
   return (
     <Sheet title={`${L('stepPacked')} · ${o.orderName}`} onClose={onClose}>
-      <p className="muted">{o.name || 'No name'} · {inr(o.total)}</p>
+      <p className="muted">{o.name || 'No name'} · {inr(o.total)} · <ProviderBadge provider={o.dq.provider || 'shipway'} /></p>
       <div className="awb-box">
-        <div><span>AWB number</span><b>{live.awb || (live.looking ? 'Checking Shipway…' : '—')}</b></div>
+        <div><span>AWB number</span><b>{live.awb || (live.looking ? `Checking ${pl}…` : '—')}</b></div>
         <div><span>Courier</span><b>{live.courier || (live.looking ? '' : '—')}</b></div>
-        <small className="muted">{live.awb ? 'Filled from Shipway. Nothing to type.' : live.looking ? 'Asking Shipway for this order…' : !live.shipwayConfigured ? 'Shipway is not connected on the server.' : 'Shipway has no AWB for this order yet.'}</small>
-        {!live.awb && !live.looking && <button className="btn ghost" onClick={look}>Fetch from Shipway again</button>}
+        <small className="muted">{live.awb ? `Filled from ${pl}. Nothing to type.` : live.looking ? `Asking ${pl} for this order…` : !live.shipwayConfigured ? `${pl} is not connected on the server.` : `${pl} has no AWB for this order yet.`}</small>
+        {!live.awb && !live.looking && <button className="btn ghost" onClick={look}>Fetch from {pl} again</button>}
       </div>
       {!live.awb && !live.looking && (live.allowManual
-        ? <><label className="sheet-label" htmlFor="pk-awb">Type the AWB from the label (only because Shipway has none yet)</label><input id="pk-awb" type="text" autoCapitalize="characters" autoComplete="off" maxLength={40} value={manual} onChange={(e) => setManual(e.target.value)} placeholder="AWB number" /></>
-        : <div className="banner">Wait for the shipment to be created in Shipway, then press “Fetch from Shipway again”.</div>)}
-      <button className="btn big good" disabled={busy || !ready} onClick={submit}>{busy ? 'Saving…' : !awb.trim() ? 'Waiting for the AWB from Shipway' : `Save: ${L('stepPacked').toLowerCase()}`}</button>
+        ? <><label className="sheet-label" htmlFor="pk-awb">Type the AWB from the label (only because {pl} has none yet)</label><input id="pk-awb" type="text" autoCapitalize="characters" autoComplete="off" maxLength={40} value={manual} onChange={(e) => setManual(e.target.value)} placeholder="AWB number" /></>
+        : <div className="banner">Wait for the shipment to be created in {pl}, then press “Fetch from {pl} again”.</div>)}
+      <button className="btn big good" disabled={busy || !ready} onClick={submit}>{busy ? 'Saving…' : !awb.trim() ? `Waiting for the AWB from ${pl}` : `Save: ${L('stepPacked').toLowerCase()}`}</button>
     </Sheet>
   );
 }
@@ -208,17 +237,19 @@ function HandoverSheet({ orders, manifest, conf, show, onClose, onDone }) {
   };
   return (
     <Sheet title={manifest ? `${L('stepHandover')} · manifest ${manifest}` : orders.length === 1 ? `${L('stepHandover')} · ${orders[0].orderName}` : `${L('stepHandover')} · ${orders.length} orders`} onClose={onClose}>
+      <p className="muted"><ProviderBadge provider={orders[0] && orders[0].dq.provider} /></p>
       {manifest && <p className="muted">One photo of the manifest hands over all {orders.length} {orders.length === 1 ? 'order' : 'orders'} below.</p>}
       <ul className="dq-list">{orders.map((o) => <li key={o.orderId}><b>{o.orderName}</b><span>{o.dq.packed ? `AWB ${o.dq.packed.awb}` : ''}</span></li>)}</ul>
       <MultiPhotoField label="Photos of the manifest" files={files} setFiles={setFiles} required={need} />
-      <p className="muted">After this the {orders.length === 1 ? 'order moves' : 'orders move'} to {L('tabTransit')}, where Shipway tracking is fetched.</p>
+      <p className="muted">After this the {orders.length === 1 ? 'order moves' : 'orders move'} to {L('tabTransit')}, where {providerLabel((orders[0] && orders[0].dq.provider) || 'shipway')} tracking is fetched.</p>
       <button className="btn big good" disabled={busy || (need && !files.length)} onClick={submit}>{busy ? 'Saving…' : need && !files.length ? 'Add a manifest photo to save' : 'Save: handed over'}</button>
     </Sheet>
   );
 }
 
 // Create manifest: pick a courier, one tap creates the manifest in Shipway for every packed order of that courier.
-function ManifestSheet({ couriers, names, show, onClose, onDone }) {
+function ManifestSheet({ provider, couriers, names, show, onClose, onDone }) {
+  const pl = providerLabel(provider);
   const [courier, setCourier] = useState(couriers.length === 1 ? couriers[0].courier : '');
   const pick = couriers.find((c) => c.courier === courier);
   const [ticked, setTicked] = useState(() => new Set(couriers.length === 1 ? couriers[0].orders.map((o) => o.orderId) : []));
@@ -229,7 +260,7 @@ function ManifestSheet({ couriers, names, show, onClose, onDone }) {
   const n = pick ? pick.orders.filter((o) => ticked.has(o.orderId)).length : 0;
   const submit = async () => {
     setBusy(true);
-    try { const r = await api.post('/desk/dispatch/manifest', { courier, orderIds: pick.orders.filter((o) => ticked.has(o.orderId)).map((o) => o.orderId) }); notifyDesk(); setRes(r); }
+    try { const r = await api.post('/desk/dispatch/manifest', { provider, courier, orderIds: pick.orders.filter((o) => ticked.has(o.orderId)).map((o) => o.orderId) }); notifyDesk(); setRes(r); }
     catch (e) { show(e.message, 'err'); if (e.status === 409) onDone(); } finally { setBusy(false); }
   };
   if (res) {
@@ -237,10 +268,10 @@ function ManifestSheet({ couriers, names, show, onClose, onDone }) {
     return (
       <Sheet title={res.manifestId ? `Manifest ${res.manifestId} created` : 'No manifest created'} onClose={onDone}>
         {res.manifestId
-          ? <p>{res.created.length} {res.created.length === 1 ? 'order is' : 'orders are'} on manifest <b>{res.manifestId}</b> ({res.courier}). Find the group in Order handover and add one photo.</p>
+          ? <p>{res.created.length} {res.created.length === 1 ? 'order is' : 'orders are'} on {pl} manifest <b>{res.manifestId}</b> ({res.courier}). Find the group in the {pl} part of Order handover and add one photo.{res.manifestUrl && <> <a href={res.manifestUrl} target="_blank" rel="noreferrer">Open the manifest PDF</a></>}</p>
           : res.noId
-            ? <div className="banner warn"><b>Shipway said: “{res.shipwayMessage}”</b> but it did not send a manifest ID the app can read, so no order was grouped. The manifest may now exist in Shipway, so do not press Create manifest again for these orders. Send the details below to support.</div>
-            : <div className="banner">Shipway did not create a manifest, so no order was grouped.</div>}
+            ? <div className="banner warn"><b>{pl} said: “{res.shipwayMessage}”</b> but it did not send a manifest ID the app can read, so no order was grouped. The manifest may now exist in {pl}, so do not press Create manifest again for these orders. Send the details below to support.</div>
+            : <div className="banner">{pl} did not create a manifest, so no order was grouped.</div>}
         {res.rawReply && <details><summary className="muted">Details for support</summary><pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>{res.rawReply}</pre></details>}
         {bad.length > 0 && <>
           <p className="sd-q">{bad.length} {bad.length === 1 ? 'order was' : 'orders were'} left out:</p>
@@ -253,9 +284,9 @@ function ManifestSheet({ couriers, names, show, onClose, onDone }) {
     );
   }
   return (
-    <Sheet title="Create manifest" onClose={onClose}>
-      <p className="muted">Pick the courier, then tick only the orders that are really packed and ready. Unticked orders stay waiting and are not sent to Shipway. Shipway may still refuse some; those are left out and the reason is shown.</p>
-      {!couriers.length && <div className="banner warn">No packed orders with a courier name are waiting for a manifest.</div>}
+    <Sheet title={`Create ${pl} manifest`} onClose={onClose}>
+      <p className="muted"><ProviderBadge provider={provider} /> Pick the courier, then tick only the orders that are really packed and ready. Unticked orders stay waiting and are not sent to {pl}. {pl} may still refuse some; those are left out and the reason is shown.</p>
+      {!couriers.length && <div className="banner warn">No packed {pl} orders with a courier name are waiting for a manifest.</div>}
       <p className="sd-q">Which courier?</p>
       <div className="reasons" role="radiogroup" aria-label="Courier">
         {couriers.map((c) => <button key={c.courier} role="radio" aria-checked={courier === c.courier} className={`reason-opt ${courier === c.courier ? 'on' : ''}`} onClick={() => choose(c)}>{c.courier} · {c.count}</button>)}
@@ -273,7 +304,7 @@ function ManifestSheet({ couriers, names, show, onClose, onDone }) {
           ))}
         </ul>
       </>}
-      <button className="btn big good" disabled={busy || !pick || n === 0} onClick={submit}>{busy ? 'Asking Shipway…' : !pick ? 'Pick a courier' : n === 0 ? 'Tick at least one order' : `Create manifest for ${n} ticked ${n === 1 ? 'order' : 'orders'}`}</button>
+      <button className="btn big good" disabled={busy || !pick || n === 0} onClick={submit}>{busy ? `Asking ${pl}…` : !pick ? 'Pick a courier' : n === 0 ? 'Tick at least one order' : `Create manifest for ${n} ticked ${n === 1 ? 'order' : 'orders'}`}</button>
     </Sheet>
   );
 }
@@ -281,15 +312,16 @@ function ManifestSheet({ couriers, names, show, onClose, onDone }) {
 // One group per manifest id: the order ids with their AWBs, and one photo for the whole group.
 function ManifestGroup({ g, canAct, onHand, onOpen }) {
   return (
-    <article className="sd-card dispatch dq-card manifest-group" aria-label={`Manifest ${g.manifestId}`}>
+    <article className={`sd-card dispatch dq-card manifest-group ${g.provider ? `prov-${g.provider}` : ''}`} aria-label={`Manifest ${g.manifestId}, ${providerLabel(g.provider)}`}>
       <header>
-        <div className="sd-id"><b>Manifest {g.manifestId}</b></div>
+        <div className="sd-id"><b>Manifest {g.manifestId}</b><ProviderBadge provider={g.provider} /></div>
         <span className="sd-due wait">{g.orders.length} {g.orders.length === 1 ? 'order' : 'orders'}{g.courier ? ` · ${g.courier}` : ''}</span>
       </header>
       <ul className="dq-list">
         {g.orders.map((o) => <li key={o.orderId}><button className="link" onClick={() => onOpen(o.orderId)}>{o.orderName}</button><span>AWB {(o.dq.packed && o.dq.packed.awb) || '—'}</span></li>)}
       </ul>
       {g.byName && <small className="muted">Created by {g.byName}{g.at ? `, ${fmtWhen(g.at)}` : ''}</small>}
+      {g.url && <small><a href={g.url} target="_blank" rel="noreferrer">Open manifest PDF</a></small>}
       {canAct && <div className="dq-row"><button className="btn good dq-done" onClick={() => onHand(g)}>Hand over manifest (1 photo)</button></div>}
     </article>
   );
@@ -311,23 +343,27 @@ export default function DispatchBoard() {
   const [toast, show] = useToast();
   const [open, setOpen] = useState(null);
   const assign = useAssign({ reload, show });
-  const [packing, setPacking] = useState(null); const [handing, setHanding] = useState(null); const [handingManifest, setHandingManifest] = useState(null); const [making, setMaking] = useState(false);
+  const [slipping, setSlipping] = useState(null); const [packing, setPacking] = useState(null); const [handing, setHanding] = useState(null); const [handingManifest, setHandingManifest] = useState(null); const [making, setMaking] = useState(null); // making = 'shipway' | 'shiprocket' | null
   const [holding, setHolding] = useState(null); const [resuming, setResuming] = useState(null); const [cancelling, setCancelling] = useState(null);
   const [picked, setPicked] = useState([]); const [busyId, setBusyId] = useState(null);
   const conf = data && data.config;
   const c = data && data.counts;
   const handoverAll = data ? data.columns.handover : [];
-  const looseIds = data ? new Set(data.looseHandover || handoverAll.map((o) => o.orderId)) : new Set();
-  const handover = handoverAll.filter((o) => looseIds.has(o.orderId)); // only orders without a manifest are picked one by one
-  useEffect(() => { setPicked((p) => p.filter((id) => handover.some((o) => o.orderId === id))); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const byId = new Map(handoverAll.map((o) => [o.orderId, o]));
+  // Order handover has two halves, one per service. Only orders without a manifest are picked one by one.
+  const sideOf = (provider) => {
+    const side = data && data.handover ? data.handover[provider] : null;
+    const loose = side ? side.loose.map((id) => byId.get(id)).filter(Boolean) : [];
+    return { provider, side, loose };
+  };
+  const allLoose = data && data.handover ? PROVIDERS.flatMap((p) => sideOf(p).loose) : [];
+  useEffect(() => { setPicked((p) => p.filter((id) => allLoose.some((o) => o.orderId === id))); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   const done = async (o, key) => {
     if (key === 'packed') return setPacking(o);
     if (key === 'handover') return setHanding([o]);
-    setBusyId(o.orderId);
-    try { await api.post(`/desk/dispatch/${o.orderId}/slip`); notifyDesk(); show(`${o.orderName}: packing slip done. It is now in Order packed.`); reload(); }
-    catch (e) { show(e.message, 'err'); if (e.status === 409) reload(); } finally { setBusyId(null); }
+    setSlipping(o); // the slip is marked done inside the sheet, once Shipway or Shiprocket is chosen
   };
   const finish = (setter) => () => { setter(null); setHandingManifest(null); setPicked([]); reload(); };
   const held = data ? data.hold || [] : [];
@@ -335,7 +371,7 @@ export default function DispatchBoard() {
   return (
     <section>
       <div className="dq-head">
-        <p className="sd-hint">Confirmed orders land in Packing slip. Press {L('btnDone')} on a card to move it to the next column; each column has its own deadline.</p>
+        <p className="sd-hint">Confirmed orders land in Packing slip. Press {L('btnDone')} on a card, choose Shipway or Shiprocket, and it moves to the next column with that choice shown on the card. Each column has its own deadline.</p>
         {user.role === 'admin' && <Link className="btn ghost" to="/orders/shopify-desk/settings#dispatch">⚙ Dispatch settings</Link>}
       </div>
       <div className="filters"><input type="search" placeholder="Search order number, name or phone" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" /><span className="grow" />
@@ -345,8 +381,7 @@ export default function DispatchBoard() {
         {data && (
           <div className="dq-board">
             {COLS.map((col) => {
-              const items = col.key === 'handover' ? handover : data.columns[col.key];
-              const groups = col.key === 'handover' ? data.manifests || [] : [];
+              const items = col.key === 'handover' ? [] : data.columns[col.key];
               const st = conf.stages[col.key];
               return (
                 <div key={col.key} className={`dq-col ${col.key}`}>
@@ -356,23 +391,44 @@ export default function DispatchBoard() {
                     <span className="dq-when">{whenLabel(st)}</span>
                     <small>{col.hint(L)}</small>
                     {data.assign.modes[col.key] !== 'off' && <span className="dq-when asg">{data.assign.modes[col.key] === 'auto' ? 'Shared out automatically' : 'Assigned by an admin'}</span>}
-                    {data.assign.modes[col.key] !== 'off' && isAdmin && <Workload items={items} />}
-                    {col.key === 'handover' && actor && (items.length > 0 || (data.manifestCouriers || []).length > 0) && (
-                      <div className="dq-bulk"><button className="btn good" onClick={() => setMaking(true)}>Create manifest for all packed orders</button></div>
-                    )}
-                    {col.key === 'handover' && actor && items.length > 0 && (
-                      <div className="dq-bulk">
-                        <button className="btn ghost" onClick={() => setPicked(picked.length === items.length ? [] : items.map((o) => o.orderId))}>{picked.length === items.length ? 'Clear' : 'Select all'}</button>
-                        <button className="btn good" disabled={!picked.length} onClick={() => setHanding(items.filter((o) => picked.includes(o.orderId)))}>Hand over selected ({picked.length})</button>
-                      </div>
-                    )}
+                    {data.assign.modes[col.key] !== 'off' && isAdmin && <Workload items={col.key === 'handover' ? handoverAll : items} />}
                   </div>
                   <div className="dq-cards">
-                    {groups.map((g) => <ManifestGroup key={g.manifestId} g={g} canAct={actor} onHand={(grp) => { setHandingManifest(grp.manifestId); setHanding(grp.orders); }} onOpen={setOpen} />)}
-                    {groups.length > 0 && items.length > 0 && <p className="sd-hint">Not on a manifest yet:</p>}
-                    {items.length === 0 && groups.length > 0 ? null : items.length === 0
-                      ? <Empty title="Nothing here">{col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
-                      : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onOpen={setOpen} />)}
+                    {col.key === 'handover'
+                      ? PROVIDERS.map((pv) => {
+                        const { side, loose } = sideOf(pv);
+                        if (!side) return null;
+                        const groups = side.manifests || [];
+                        const mine = picked.filter((id) => loose.some((o) => o.orderId === id));
+                        const allPicked = loose.length > 0 && mine.length === loose.length;
+                        return (
+                          <div key={pv} className={`dq-side ${pv}`} aria-label={`${providerLabel(pv)} orders`}>
+                            <div className="dq-sidehead">
+                              <h3>{providerLabel(pv)}</h3><span className="sd-count">{side.count}</span>
+                              {!side.configured && <span className="dq-off" title={`${providerLabel(pv)} login is not set on the server`}>not connected</span>}
+                            </div>
+                            {actor && (loose.length > 0 || (side.couriers || []).length > 0) && (
+                              <div className="dq-bulk"><button className="btn good" onClick={() => setMaking(pv)}>Create {providerLabel(pv)} manifest</button></div>
+                            )}
+                            {actor && loose.length > 0 && (
+                              <div className="dq-bulk">
+                                <button className="btn ghost" onClick={() => setPicked(allPicked ? picked.filter((id) => !loose.some((o) => o.orderId === id)) : [...new Set([...picked, ...loose.map((o) => o.orderId)])])}>{allPicked ? 'Clear' : 'Select all'}</button>
+                                <button className="btn good" disabled={!mine.length} onClick={() => setHanding(loose.filter((o) => mine.includes(o.orderId)))}>Hand over selected ({mine.length})</button>
+                              </div>
+                            )}
+                            <div className="dq-sidecards">
+                              {groups.map((g) => <ManifestGroup key={g.manifestId} g={g} canAct={actor} onHand={(grp) => { setHandingManifest(grp.manifestId); setHanding(grp.orders); }} onOpen={setOpen} />)}
+                              {groups.length > 0 && loose.length > 0 && <p className="sd-hint">Not on a manifest yet:</p>}
+                              {loose.length === 0 && groups.length === 0
+                                ? <Empty title={`No ${providerLabel(pv)} orders`}>{q ? 'No orders match this search.' : `Packed orders booked through ${providerLabel(pv)} appear here.`}</Empty>
+                                : loose.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onOpen={setOpen} />)}
+                            </div>
+                          </div>
+                        );
+                      })
+                      : items.length === 0
+                        ? <Empty title="Nothing here">{col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
+                        : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onOpen={setOpen} />)}
                   </div>
                 </div>
               );
@@ -394,8 +450,9 @@ export default function DispatchBoard() {
       {holding && <HoldSheet order={holding} show={show} onClose={() => setHolding(null)} onDone={finish(setHolding)} />}
       {resuming && <ResumeSheet order={resuming} show={show} onClose={() => setResuming(null)} onDone={finish(setResuming)} />}
       {cancelling && <CancelSheet order={cancelling} reasons={(data && data.cancelReasons) || []} show={show} onClose={() => setCancelling(null)} onDone={finish(setCancelling)} />}
+      {slipping && <ProviderSheet order={slipping} show={show} onClose={() => setSlipping(null)} onDone={finish(setSlipping)} />}
       {packing && <PackedSheet order={packing} conf={conf} show={show} onClose={() => setPacking(null)} onDone={finish(setPacking)} />}
-      {making && <ManifestSheet couriers={data.manifestCouriers || []} names={Object.fromEntries(handoverAll.map((o) => [o.orderId, o.orderName]))} show={show} onClose={() => setMaking(false)} onDone={() => { setMaking(false); reload(); }} />}
+      {making && <ManifestSheet provider={making} couriers={(data.handover && data.handover[making] && data.handover[making].couriers) || []} names={Object.fromEntries(handoverAll.map((o) => [o.orderId, o.orderName]))} show={show} onClose={() => setMaking(null)} onDone={() => { setMaking(null); reload(); }} />}
       {handing && <HandoverSheet orders={handing} manifest={handingManifest} conf={conf} show={show} onClose={() => { setHanding(null); setHandingManifest(null); }} onDone={finish(setHanding)} />}
       {open && <OrderDrawer orderId={open} onClose={() => setOpen(null)} />}
       {toast}

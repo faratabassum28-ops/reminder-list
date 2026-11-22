@@ -110,7 +110,7 @@ router.get('/dispatch/config', wrap(async (req, res) => res.json(await svc.getDi
 router.put('/dispatch/config', adminOnly, wrap(async (req, res) => res.json(await svc.saveDispatchConfig(req.body || {}))));
 router.get('/dispatch/board', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchBoard({ ...req.query, viewer: req.staff }))));
 router.get('/dispatch/:orderId/awb', need('packing'), wrap(async (req, res) => res.json(await svc.liveAwb(orderIdOf(req)))));
-router.post('/dispatch/:orderId/slip', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchSlip(who(req), orderIdOf(req)))));
+router.post('/dispatch/:orderId/slip', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchSlip(who(req), orderIdOf(req), { provider: req.body && req.body.provider }))));
 router.post('/dispatch/:orderId/hold', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchHold(who(req), orderIdOf(req), { note: req.body && req.body.note }))));
 router.post('/dispatch/:orderId/resume', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchResume(who(req), orderIdOf(req), { note: req.body && req.body.note }))));
 router.post('/dispatch/:orderId/cancel', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchCancel(who(req), orderIdOf(req), { reason: req.body && req.body.reason, note: req.body && req.body.note }))));
@@ -118,7 +118,7 @@ router.post('/dispatch/:orderId/packed', need('packing'), takeFiles('photos', 'p
   const b = req.body || {};
   res.json(await svc.dispatchPacked(who(req), orderIdOf(req), { awb: b.awb, courier: b.courier, files: req.photos }));
 }));
-router.post('/dispatch/manifest', need('packing'), wrap(async (req, res) => res.json(await svc.createManifest(who(req), { courier: req.body && req.body.courier, orderIds: req.body && req.body.orderIds }))));
+router.post('/dispatch/manifest', need('packing'), wrap(async (req, res) => res.json(await svc.createManifest(who(req), { courier: req.body && req.body.courier, orderIds: req.body && req.body.orderIds, provider: req.body && req.body.provider }))));
 router.post('/dispatch/handover', need('packing'), takeFiles('manifests', 'manifest'), wrap(async (req, res) => {
   const b = req.body || {};
   let ids = [];
@@ -132,7 +132,7 @@ router.get('/proofs/:id', wrap(async (req, res) => {
   res.send(buf);
 }));
 
-// In-transit orders: handed over, tracked through Shipway
+// In-transit orders: handed over, tracked through Shipway or Shiprocket (whichever the packing team chose)
 router.get('/transit', wrap(async (req, res) => res.json(await svc.transitList(req.query))));
 router.post('/transit/refresh', wrap(async (req, res) => res.json(await svc.refreshTransit({ ids: Array.isArray(req.body && req.body.orderIds) ? req.body.orderIds : null, limit: 60 }))));
 
