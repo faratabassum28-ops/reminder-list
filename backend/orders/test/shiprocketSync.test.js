@@ -129,3 +129,24 @@ test('sync: a record left by the other service is not kept when this order is lo
   assert.equal(store.get(4000).found, false);
   assert.equal(store.get(4000).provider, 'shiprocket');
 });
+
+test('client: when the search misses an order, it is found in the newest orders list', async () => {
+  rocket._reset();
+  fake((u) => {
+    if (u.pathname.endsWith('/auth/login')) return json({ token: 'T' });
+    if (u.pathname.endsWith('/orders')) return json({ data: u.searchParams.get('search') ? [] : [ORDER] }); // the search finds nothing; the plain list has it
+    if (u.pathname.includes('/courier/track/awb/')) return json(TRACK);
+    return json({}, 404);
+  });
+  const r = await rocket.getOrderShipment(2919);
+  assert.equal(r.found, true);
+  assert.equal(r.response.order.id, 9001);
+  await rocket.getOrderShipment(2919);
+  assert.equal(calls.filter((c) => c.path === 'orders' && !c.search.includes('search=')).length, 1, 'the newest-orders list is fetched once, then kept');
+});
+
+test('client: recentOrders is shown in a plain shape for the Settings test', async () => {
+  rocket._reset(); fake(api);
+  const list = (await rocket.recentOrders(10, { fresh: true })).map(rocket.simple);
+  assert.deepEqual(list.find((x) => x.channelOrderId === '2919'), { channelOrderId: '2919', shiprocketId: '9001', status: 'PICKUP SCHEDULED', awb: 'SR123456', courier: 'Delhivery Surface' });
+});
