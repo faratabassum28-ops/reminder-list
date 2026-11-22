@@ -139,6 +139,21 @@ function slipDone(doc, conf, who = { id: 'system', name: 'System' }, now = new D
   return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'slip_done', label: `Packing slip done${provider ? ` · ${PR.labelOf(provider)}` : ''}${t.late ? ' (late)' : ''}` }] };
 }
 
+// Change which service an order ships through. Only at "Order packed", before an AWB is saved: the AWB belongs to the service that made it.
+// Needed for orders that were already past the slip step before Shiprocket existed (they count as Shipway), and for a wrong tap.
+function providerChanged(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
+  if (stepOf(doc) !== 'packed') {
+    throw httpErr(409, stepOf(doc) === 'slip'
+      ? `Order #${doc.orderId} is still at the packing slip: choose Shipway or Shiprocket when you press DONE.`
+      : `Order #${doc.orderId} already has an AWB, so its service cannot be changed any more. Refresh to see its latest step.`);
+  }
+  const to = cleanProvider(input.provider);
+  const from = PR.providerOf(doc);
+  if (to === from) throw httpErr(409, `Order #${doc.orderId} already ships through ${PR.labelOf(to)}.`);
+  const dq = { ...(doc.dq || {}), provider: { name: to, at: now, byName: who.name, byId: who.id, from } };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'provider_switch', label: `Switched from ${PR.labelOf(from)} to ${PR.labelOf(to)}` }] };
+}
+
 // "Letters, digits and - _ /" only, 5 to 40 long. Upper-cased so the same AWB typed twice always matches.
 function cleanAwb(raw) {
   const s = String(raw || '').replace(/\s+/g, '').toUpperCase();
@@ -283,5 +298,5 @@ module.exports = {
   STEPS, STEP_LABEL, MAX_HANDOVER_BATCH, MAX_PHOTOS, DEFAULT_DISPATCH_CONFIG, httpErr, idsOf,
   normaliseDispatchConfig, isWorkingDay, nextWorkingDay, dueFor, stepOf, stepStart, dueAt,
   manifestOf, manifestError, eligibleForManifest, sameCourier, manifestAssigned, manifestRejected, groupByManifest, manifestCouriers,
-  slipDone, cleanProvider, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
+  slipDone, cleanProvider, providerChanged, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
 };

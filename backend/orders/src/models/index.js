@@ -197,7 +197,7 @@ const deskOrderSchema = new Schema({
   dq: {
     step: String, // slip | packed | handover | done
     stepAt: Date, // when the current step began: its deadline is counted from here
-    provider: { name: { type: String, enum: ['shipway', 'shiprocket'] }, at: Date, byName: String, byId: String }, // chosen when the packing slip is marked done: which service books and manifests this order
+    provider: { name: { type: String, enum: ['shipway', 'shiprocket'] }, at: Date, byName: String, byId: String, from: String }, // chosen when the packing slip is marked done: which service books and manifests this order
     slip: { at: Date, byName: String, byId: String, dueAt: Date, late: Boolean },
     packed: { at: Date, byName: String, byId: String, awb: String, courier: String, photoId: String, photoIds: [String], dueAt: Date, late: Boolean }, // photoIds: every photo of the package (photoId = the first)
     handover: { at: Date, byName: String, byId: String, manifestId: String, manifestIds: [String], manifestRef: String, dueAt: Date, late: Boolean }, // manifestIds: every photo of the manifest

@@ -490,6 +490,13 @@ async function dispatchSlip(user, orderId, { provider } = {}) {
   return brief(await applyTransition(doc, t));
 }
 
+// Move an order at "Order packed" to the other service (see lib/dispatch.js providerChanged).
+async function dispatchProvider(user, orderId, { provider } = {}) {
+  const { doc } = await loadForAction(orderId, user);
+  const t = DP.providerChanged(doc, { provider }, user);
+  return brief(await applyTransition(doc, t, { assign: false }));
+}
+
 // Hold, resume and cancel from the Dispatch queue (packing team and admins). Hold and cancel both need a note.
 async function dispatchHold(user, orderId, { note }) {
   const { doc } = await loadForAction(orderId, user);
@@ -928,4 +935,4 @@ function start() {
   }
 }
 
-module.exports = { staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };
+module.exports = { staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchProvider, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };
