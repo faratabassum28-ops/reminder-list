@@ -27,7 +27,7 @@ function Due({ dueAt, now, offset }) {
   return <span className="sd-due late" title={`Was due ${fmtWhen(dueAt)}`}>Overdue {duration(-ms)}</span>;
 }
 
-function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone, onHold, onCancel, onOpen, assign }) {
+function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone, onHold, onCancel, onSwitch, onOpen, assign }) {
   const { L } = useLabels();
   const late = o.dq.dueAt && new Date(o.dq.dueAt).getTime() < now + offset;
   const awb = col.key === 'packed' ? o.dq.suggestedAwb : col.key === 'handover' && o.dq.packed ? o.dq.packed.awb : '';
@@ -58,6 +58,7 @@ function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone
         <div className="dq-row dq-side">
           <button className="btn ghost dq-hold" disabled={busy} onClick={() => onHold(o)}>⏸ Hold</button>
           <button className="btn ghost dq-cancel" disabled={busy} onClick={() => onCancel(o)}>Cancel order</button>
+          {col.key === 'packed' && onSwitch && <button className="btn ghost" disabled={busy} onClick={() => onSwitch(o)} title="Booked with the other service? Move this order to it.">⇄ Use {providerLabel(prov === 'shiprocket' ? 'shipway' : 'shiprocket')}</button>}
         </div>
       )}
     </article>
@@ -181,6 +182,13 @@ function ProviderSheet({ order: o, show, onClose, onDone }) {
 function PackedSheet({ order: o, conf, show, onClose, onDone }) {
   const { L } = useLabels();
   const pl = providerLabel(o.dq.provider || 'shipway');
+  const other = (o.dq.provider || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket';
+  const [switching, setSwitching] = useState(false);
+  const switchTo = async () => {
+    setSwitching(true);
+    try { await api.post(`/desk/dispatch/${o.orderId}/provider`, { provider: other }); notifyDesk(); show(`${o.orderName} now ships through ${providerLabel(other)}. Press ${L('btnDone')} again to fetch its AWB.`); onDone(); }
+    catch (e) { show(e.message, 'err'); if (e.status === 409) onDone(); } finally { setSwitching(false); }
+  };
   const [live, setLive] = useState({ awb: o.dq.suggestedAwb || '', courier: o.dq.suggestedCourier || '', looking: true, allowManual: !!conf.allowManualAwb, shipwayConfigured: true });
   const [manual, setManual] = useState('');
   const [busy, setBusy] = useState(false);
@@ -209,6 +217,7 @@ function PackedSheet({ order: o, conf, show, onClose, onDone }) {
         <div><span>Courier</span><b>{live.courier || (live.looking ? '' : '—')}</b></div>
         <small className="muted">{live.awb ? `Filled from ${pl}. Nothing to type.` : live.looking ? `Asking ${pl} for this order…` : !live.shipwayConfigured ? `${pl} is not connected on the server.` : `${pl} has no AWB for this order yet.`}</small>
         {!live.awb && !live.looking && <button className="btn ghost" onClick={look}>Fetch from {pl} again</button>}
+        {!live.awb && !live.looking && <button className="btn ghost" disabled={switching} onClick={switchTo}>{switching ? 'Switching…' : `Booked with ${providerLabel(other)}? Use ${providerLabel(other)} instead`}</button>}
       </div>
       {!live.awb && !live.looking && (live.allowManual
         ? <><label className="sheet-label" htmlFor="pk-awb">Type the AWB from the label (only because {pl} has none yet)</label><input id="pk-awb" type="text" autoCapitalize="characters" autoComplete="off" maxLength={40} value={manual} onChange={(e) => setManual(e.target.value)} placeholder="AWB number" /></>
@@ -365,6 +374,13 @@ export default function DispatchBoard() {
     if (key === 'handover') return setHanding([o]);
     setSlipping(o); // the slip is marked done inside the sheet, once Shipway or Shiprocket is chosen
   };
+  const switchService = async (o) => {
+    const to = (o.dq.provider || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket';
+    if (!window.confirm(`Move ${o.orderName} to ${providerLabel(to)}? Its AWB will then be read from ${providerLabel(to)}.`)) return;
+    setBusyId(o.orderId);
+    try { await api.post(`/desk/dispatch/${o.orderId}/provider`, { provider: to }); notifyDesk(); show(`${o.orderName} now ships through ${providerLabel(to)}.`); reload(); }
+    catch (e) { show(e.message, 'err'); if (e.status === 409) reload(); } finally { setBusyId(null); }
+  };
   const finish = (setter) => () => { setter(null); setHandingManifest(null); setPicked([]); reload(); };
   const held = data ? data.hold || [] : [];
 
@@ -421,14 +437,14 @@ export default function DispatchBoard() {
                               {groups.length > 0 && loose.length > 0 && <p className="sd-hint">Not on a manifest yet:</p>}
                               {loose.length === 0 && groups.length === 0
                                 ? <Empty title={`No ${providerLabel(pv)} orders`}>{q ? 'No orders match this search.' : `Packed orders booked through ${providerLabel(pv)} appear here.`}</Empty>
-                                : loose.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onOpen={setOpen} />)}
+                                : loose.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />)}
                             </div>
                           </div>
                         );
                       })
                       : items.length === 0
                         ? <Empty title="Nothing here">{col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
-                        : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onOpen={setOpen} />)}
+                        : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />)}
                   </div>
                 </div>
               );

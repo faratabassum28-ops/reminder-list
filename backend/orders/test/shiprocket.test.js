@@ -157,3 +157,28 @@ test('a "success" with no link is NOT treated as a manifest', () => {
   assert.equal(r.manifestId, null);
   assert.equal(r.accepted.length, 0);
 });
+
+// ------------------------------------------------------------ switching the service at "Order packed"
+const atPacked = (extra = {}) => ({ orderId: 2509, stage: 'dispatch', dq: { step: 'packed', ...extra } });
+
+test('an order at Order packed can be moved from Shipway to Shiprocket and back, and the change is logged', () => {
+  const d = atPacked(); // no choice recorded = Shipway
+  const t = P.providerChanged(d, { provider: 'shiprocket' }, who, ist('2026-10-19T10:00:00'));
+  assert.equal(t.set.dq.provider.name, 'shiprocket');
+  assert.equal(t.set.dq.provider.from, 'shipway');
+  assert.equal(t.set.dq.step, 'packed'); // same column, same deadline
+  assert.match(t.entries[0].label, /Switched from Shipway to Shiprocket/);
+  const back = P.providerChanged({ ...d, ...t.set }, { provider: 'shipway' }, who);
+  assert.equal(back.set.dq.provider.name, 'shipway');
+});
+
+test('switching to the service the order already uses, or to nothing, is refused', () => {
+  assert.throws(() => P.providerChanged(atPacked(), { provider: 'shipway' }, who), (e) => e.status === 409 && /already ships through Shipway/.test(e.message));
+  assert.throws(() => P.providerChanged(atPacked(), {}, who), (e) => e.status === 400);
+});
+
+test('the service cannot be changed once the AWB is saved, or before the slip is done', () => {
+  assert.throws(() => P.providerChanged({ orderId: 1, stage: 'dispatch', dq: { step: 'handover' } }, { provider: 'shiprocket' }, who), (e) => e.status === 409 && /already has an AWB/.test(e.message));
+  assert.throws(() => P.providerChanged({ orderId: 1, stage: 'dispatch', dq: { step: 'slip' } }, { provider: 'shiprocket' }, who), (e) => e.status === 409 && /packing slip/.test(e.message));
+  assert.throws(() => P.providerChanged({ orderId: 1, stage: 'cancelled' }, { provider: 'shiprocket' }, who), (e) => e.status === 409);
+});
