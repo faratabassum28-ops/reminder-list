@@ -8,7 +8,7 @@ import { MODES, inr, int } from '../format.js';
 const STATUSES = ['Pending confirmation', 'Cancelled', 'Confirmed', 'In Transit', 'Delivered', 'RTO'];
 const SHIP_GROUPS = [['delivered', 'Delivered'], ['transit', 'In transit'], ['ndr', 'Undelivered / NDR'], ['rto', 'RTO'], ['cancelled', 'Cancelled'], ['lost', 'Lost'], ['reverse', 'Reverse'], ['other', 'Other'], ['none', 'Not in Shipway']];
 const SHIP_TAG = { delivered: 'Delivered', transit: 'In', ndr: 'Pending', rto: 'RTO', cancelled: 'RTO', lost: 'RTO' };
-const ShipwayTag = ({ s }) => (s ? <span className={`tag ${SHIP_TAG[s.group] || ''}`} title={s.code ? `Shipway code ${s.code}` : ''}>{s.status}</span> : <span className="muted">—</span>);
+const ShipwayTag = ({ s }) => (s ? <span className={`tag ${SHIP_TAG[s.group] || ''}`} title={s.code ? `${s.provider === 'shiprocket' ? 'Shiprocket' : 'Shipway'} code ${s.code}` : ''}>{s.status}</span> : <span className="muted">—</span>);
 const fmtDT = (s) => (s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }) : 'Undated');
 
 function MarketingSection({ m }) {
@@ -34,17 +34,17 @@ function MarketingSection({ m }) {
 function ShipwaySection({ s }) {
   if (!s) return null;
   if (!s.found) {
-    const text = s.reason === 'not_configured' ? 'Shipway is not connected yet. Add the Shipway login in the server settings to see dispatch status here.'
-      : s.reason === 'no_id' ? 'This row has no order number, so it cannot be matched in Shipway.'
-      : s.reason === 'error' ? `Could not load this order from Shipway: ${s.error}`
-      : 'Shipway has no shipment for this order yet. Orders show up here once they are dispatched from Shipway.';
+    const text = s.reason === 'not_configured' ? 'Neither Shipway nor Shiprocket is connected yet. Add a login in the server settings to see dispatch status here.'
+      : s.reason === 'no_id' ? 'This row has no order number, so it cannot be matched in Shipway or Shiprocket.'
+      : s.reason === 'error' ? `Could not load this order from the courier service: ${s.error}`
+      : 'Neither Shipway nor Shiprocket has a shipment for this order yet. Orders show up here once they are dispatched.';
     return <div className="banner" style={{ marginTop: 14 }}>{text}</div>;
   }
   return (
     <>
-      <h2 style={{ marginTop: 18 }}>Dispatch (Shipway)</h2>
+      <h2 style={{ marginTop: 18 }}>Dispatch ({s.provider === 'shiprocket' ? 'Shiprocket' : 'Shipway'})</h2>
       <dl className="kv">
-        <dt>Shipway status</dt><dd><ShipwayTag s={s} /></dd>
+        <dt>{s.provider === 'shiprocket' ? 'Shiprocket' : 'Shipway'} status</dt><dd><ShipwayTag s={s} /></dd>
         <dt>Courier</dt><dd>{s.carrier || '—'}</dd>
         <dt>AWB</dt><dd>{s.awb || '—'}</dd>
         {s.from && <><dt>From</dt><dd>{s.from}</dd></>}

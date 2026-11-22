@@ -12,6 +12,7 @@ const { loadUnified, sourceNote } = require('../services/unifiedOrders');
 const shopify = require('../services/shopifySync');
 const shopifyAuth = require('../services/shopifyAuth');
 const shipway = require('../services/shipwaySync');
+const rocket = require('../services/shiprocketClient');
 const { GROUPS: SHIPWAY_GROUPS } = require('../lib/shipwayMap');
 const { parseCsv, assertLooksLikeOrderSheet } = require('../services/sources');
 const { getSheetConfig, saveSheetConfig } = require('../services/sheetConfig');
@@ -91,13 +92,15 @@ router.post('/shopify/sync', shopWrap(async (req, res) => {
 
 // ---------- Shipway (dispatch and tracking status) ----------
 const shipWrap = (fn) => wrap(async (req, res) => {
-  try { await fn(req, res); } catch (e) { if (e.name === 'ShipwayError') e.status = e.status === 400 ? 400 : 502; throw e; }
+  try { await fn(req, res); } catch (e) { if (e.name === 'ShipwayError' || e.name === 'ShiprocketError') e.status = e.status === 400 ? 400 : 502; throw e; }
 });
 router.get('/shipway/status', wrap(async (req, res) => res.json({ ...(await shipway.status()), groups: SHIPWAY_GROUPS })));
 router.post('/shipway/test', shipWrap(async (req, res) => res.json(await shipway.test())));
+router.get('/shiprocket/status', wrap(async (req, res) => { const st = await shipway.status(); res.json({ ...st.shiprocket, running: st.running, progress: st.progress, total: st.total, last: st.last, groups: SHIPWAY_GROUPS }); }));
+router.post('/shiprocket/test', shipWrap(async (req, res) => res.json(await shipway.testShiprocket())));
 router.post('/shipway/sync', shipWrap(async (req, res) => {
   const st = await shipway.status();
-  if (!st.configured) return res.status(400).json({ error: 'Shipway is not set up yet. Add SHIPWAY_USERNAME and SHIPWAY_LICENSE_KEY on the server.' });
+  if (!st.configured && !st.shiprocket.configured) return res.status(400).json({ error: 'Neither Shipway nor Shiprocket is set up yet. Add the login on the server.' });
   if (st.running) return res.status(409).json({ error: 'A Shipway sync is already running' });
   shipway.run({ all: req.query.all === '1', limit: 1000 }).catch((e) => console.warn('[shipway] sync failed:', e.message)); // background; progress shows in /shipway/status
   res.status(202).json({ started: true });
@@ -202,7 +205,7 @@ async function applyShipwayFilter(f) {
   }
   return f;
 }
-const shipwayCell = (s) => (s && s.found ? { status: s.status, code: s.statusCode, group: s.group, carrier: s.carrier, awb: s.awb, at: s.statusAt || s.changedAt } : null);
+const shipwayCell = (s) => (s && s.found ? { provider: s.provider || 'shipway', status: s.status, code: s.statusCode, group: s.group, carrier: s.carrier, awb: s.awb, at: s.statusAt || s.changedAt } : null);
 
 router.get('/orders', wrap(async (req, res) => {
   const { w, f } = ordersQuery(req.query);
@@ -263,12 +266,12 @@ async function shopifyBlock(orderId, reveal) {
 // Shipway tracking for the order drawer. Refreshes the order first if the saved answer is old.
 async function shipwayBlock(orderId) {
   const st = await shipway.status();
-  if (!st.configured) return { found: false, reason: 'not_configured' };
+  if (!st.configured && !st.shiprocket.configured) return { found: false, reason: 'not_configured' };
   if (orderId == null) return { found: false, reason: 'no_id' };
   const s = await shipway.ensureFresh(orderId);
   if (!s || !s.found) return { found: false, reason: s && s.error ? 'error' : 'not_found', error: s && s.error, checkedAt: s && s.checkedAt };
   return {
-    found: true, status: s.status, code: s.statusCode, group: s.group, final: s.final, carrier: s.carrier, awb: s.awb, from: s.from, to: s.to,
+    found: true, provider: s.provider || 'shipway', status: s.status, code: s.statusCode, group: s.group, final: s.final, carrier: s.carrier, awb: s.awb, from: s.from, to: s.to,
     pickupDate: s.pickupDate, statusTime: s.statusTime, statusAt: s.statusAt, checkedAt: s.checkedAt, history: s.history || [],
   };
 }

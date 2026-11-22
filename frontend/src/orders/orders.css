@@ -892,3 +892,36 @@
 .oa-scope[data-oa-theme="dark"] .fn-total td { background: #2c3128; }
 .oa-scope[data-oa-theme="dark"] .dq-hold { color: #f0cb90; }
 .oa-scope[data-oa-theme="dark"] .dq-card.held { background: #423213; }
+
+/* ---- Shipway / Shiprocket: which service an order ships through ---- */
+.oa-scope .prov-tag {display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 8px; border-radius: 6px; border: 1px solid transparent; white-space: nowrap;}
+.oa-scope .prov-tag.shipway {background: #e6f0fb; color: #1b4f8f; border-color: #b7d0ee;}
+.oa-scope .prov-tag.shiprocket {background: #f1e9fb; color: #5b2a99; border-color: #d3bdee;}
+/* a card whose provider is chosen is tinted and gets a coloured top edge, so the two services are told apart at a glance */
+.oa-scope .dq-card.prov-shipway {border-top: 4px solid #2f6fcb; background: color-mix(in srgb, var(--surface) 93%, #2f6fcb 7%);}
+.oa-scope .dq-card.prov-shiprocket {border-top: 4px solid #8a4fd6; background: color-mix(in srgb, var(--surface) 93%, #8a4fd6 7%);}
+.oa-scope .dq-card.late.prov-shipway, .oa-scope .dq-card.late.prov-shiprocket {border-left-color: var(--cancel) !important;}
+.oa-scope .prov-pick {display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 14px;}
+.oa-scope .prov-pick button {display: grid; gap: 4px; justify-items: center; padding: 20px 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font: inherit; color: var(--ink); min-height: 96px;}
+.oa-scope .prov-pick button b {font-size: 19px; letter-spacing: -.01em;}
+.oa-scope .prov-pick button small {color: var(--ink-3);}
+.oa-scope .prov-pick button.shipway:hover:not(:disabled), .oa-scope .prov-pick button.shipway:focus-visible {border-color: #2f6fcb; background: #eef5fd;}
+.oa-scope .prov-pick button.shiprocket:hover:not(:disabled), .oa-scope .prov-pick button.shiprocket:focus-visible {border-color: #8a4fd6; background: #f6f0fd;}
+.oa-scope .prov-pick button:disabled {opacity: .6; cursor: progress;}
+/* Order handover: two halves, one per service */
+.oa-scope .dq-side {display: grid; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); min-width: 0;}
+.oa-scope .dq-side.shipway {border-top: 4px solid #2f6fcb;}
+.oa-scope .dq-side.shiprocket {border-top: 4px solid #8a4fd6;}
+.oa-scope .dq-sidehead {display: flex; align-items: center; gap: 8px; flex-wrap: wrap;}
+.oa-scope .dq-sidehead h3 {margin: 0; font-size: 15px;}
+.oa-scope .dq-sidehead .sd-count {margin-left: 2px;}
+.oa-scope .dq-sidecards {display: grid; gap: 12px; min-width: 0;}
+.oa-scope .dq-off {color: var(--warn); font-size: 12px; font-weight: 600;}
+.oa-scope .prov-filter {display: flex; gap: 6px; flex-wrap: wrap; align-items: center;}
+.oa-scope .prov-filter button {border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer;}
+.oa-scope .prov-filter button.on {background: var(--accent-soft); border-color: var(--accent); color: var(--accent);}
+.oa-scope .prov-filter button b {margin-left: 6px; font-weight: 700;}
+.oa-scope[data-oa-theme="dark"] .prov-tag.shipway {background: rgba(79, 140, 230, .16); color: #9cc2f5; border-color: rgba(79, 140, 230, .4);}
+.oa-scope[data-oa-theme="dark"] .prov-tag.shiprocket {background: rgba(160, 110, 230, .18); color: #cbb0f2; border-color: rgba(160, 110, 230, .45);}
+.oa-scope[data-oa-theme="dark"] .prov-pick button.shipway:hover:not(:disabled), .oa-scope[data-oa-theme="dark"] .prov-pick button.shipway:focus-visible {background: rgba(79, 140, 230, .12);}
+.oa-scope[data-oa-theme="dark"] .prov-pick button.shiprocket:hover:not(:disabled), .oa-scope[data-oa-theme="dark"] .prov-pick button.shiprocket:focus-visible {background: rgba(160, 110, 230, .14);}

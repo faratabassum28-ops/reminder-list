@@ -23,3 +23,31 @@ One repo, one backend, one deploy, one login. Nothing else to run.
 4. Push. After it works, the old Order Analytics repo/service can be switched off.
 
 Extra env: `ORDERS_SYNC=0` stops the background jobs on an instance (leave at 1 on exactly one instance).
+
+## Shiprocket (second shipping service, next to Shipway)
+
+Orders can now ship through **Shipway or Shiprocket**. The packing team chooses per order, and everything after that follows the choice.
+
+**How it works on the Dispatch board**
+1. **Packing slip → DONE** opens a chooser: *Shipway* or *Shiprocket*. It cannot be skipped (the server refuses a slip with no choice).
+2. From then on every card (Order packed, Order handover, On hold) shows a coloured **Shipway (blue) / Shiprocket (purple)** tag and a tinted card.
+3. **Order packed**: the AWB and courier are read from the order's own service.
+4. **Order handover** is split in two parts: a **Shipway** half and a **Shiprocket** half. Each has its own *Create manifest* button, its own manifest groups, its own loose orders and its own courier list. Shipway and Shiprocket orders can never be handed over together.
+5. **In-transit orders** show a *Service* column and a Both / Shipway / Shiprocket filter. Tracking is fetched from the service the order was booked with, and is stored in the same collection, so NDR, RTO, weight cases, funnel and the Overview work for Shiprocket orders with no extra setup.
+6. Orders that were already past the slip step before this change count as **Shipway**.
+
+**Connect Shiprocket (once)**
+1. Shiprocket → Settings → API → **Add New API User** (use a different email from your main login).
+2. On the server set `SHIPROCKET_EMAIL` and `SHIPROCKET_PASSWORD` (that API user's) and redeploy. See `backend/.env.example`.
+3. Order Analytics → Settings → **Shiprocket** card → *Test connection*.
+4. The order number in Shiprocket must equal the Shopify order number (`2919` or `#2919` both match).
+
+`SHIPROCKET_MOCK=1` pretends to be Shiprocket for local testing (no account needed).
+
+**Things to check against your own Shiprocket account** (their docs are a client-rendered page, so these were written from the public API and are covered by tests with a fake Shiprocket, not a live account):
+- *Order lookup* uses `GET /v1/external/orders?search=<order no.>` and accepts only the exact `channel_order_id`.
+- *Tracking* uses `GET /v1/external/courier/track/awb/{awb}`; numeric statuses and text are mapped onto the same codes Shipway uses (`lib/shiprocketMap.js`).
+- *Manifest* uses `POST /v1/external/manifests/generate`. Shiprocket sends back a PDF link and **no manifest id**, so the app makes its own reference (`SR-<digits from the link>`) to group the orders and keeps the link on the group ("Open manifest PDF"). If Shiprocket needs a pickup to be scheduled first, the manifest call is refused and the reason is shown on each card.
+- Weights are read as **kg** (`SHIPROCKET_WEIGHT_UNIT=g` to change).
+
+Tests: `cd backend && npm run test:orders` (new: `shiprocket.test.js`, `shiprocketSync.test.js`).

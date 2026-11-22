@@ -93,7 +93,7 @@ test('shipway sync: saves status, records changes, never wipes a known status on
     },
   };
   const prevLoad = Module._load;
-  Module._load = function (req, ...r) { return /\/models$/.test(req) ? { ShipwayShipment: model, Order: {}, Setting: {} } : prevLoad.call(this, req, ...r); };
+  Module._load = function (req, ...r) { return /\/models$/.test(req) ? { ShipwayShipment: model, Order: {}, Setting: {}, DeskOrder: { findOne: () => ({ select: () => ({ lean: async () => null }) }) } } : prevLoad.call(this, req, ...r); };
   delete require.cache[require.resolve('../src/services/shipwaySync')];
   const sync = require('../src/services/shipwaySync');
   Module._load = prevLoad;
