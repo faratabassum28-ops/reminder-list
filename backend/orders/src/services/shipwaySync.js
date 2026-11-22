@@ -173,7 +173,18 @@ async function testShiprocket() {
     const r = await lookup(o.orderId, 'shiprocket');
     if (r.found) { const d = r.doc; sample = { orderId: o.orderId, shipwayOrderId: r.id, status: d.status, code: d.statusCode, carrier: d.carrier, awb: d.awb, weightKeys: d.weightKeys }; break; }
   }
-  if (!sample && recent.length) problems.push(`Login works, but Shiprocket has no shipment with an AWB for ${mine.length ? 'the orders marked Shiprocket' : 'the newest orders'} (${recent.map((o) => o.orderId).join(', ')}). Either no AWB was created yet, or Shiprocket holds them under a different order number (it must match the Shopify order number).`);
+  let held = [];
+  try { held = (await rocket.recentOrders(10, { fresh: true })).map(rocket.simple); } catch (e) { if (e.code === 'auth') throw e; }
+  if (!sample && recent.length) {
+    problems.push(`Login works, but Shiprocket has no shipment with an AWB for ${mine.length ? 'the orders marked Shiprocket' : 'the newest orders'} (${recent.map((o) => o.orderId).join(', ')}).`);
+    if (!held.length) problems.push('Shiprocket returned no orders at all. Check that this API user has the Orders module ticked, and that Shiprocket has orders for this account.');
+    else {
+      const shows = held.slice(0, 5).map((h) => `${h.channelOrderId || '(no channel order id)'} → ${h.status || 'no status'}${h.awb ? `, AWB ${h.awb}` : ', no AWB'}`).join(' | ');
+      const same = held.some((h) => String(h.channelOrderId).replace(/^#/, '') === String(recent[0].orderId));
+      problems.push(`Newest orders in Shiprocket: ${shows}.`);
+      problems.push(same ? 'The newest Shopify order is in Shiprocket but has no AWB yet. Create the shipment in Shiprocket, then test again.' : 'The newest Shopify orders are not in that list. If the numbers above look different from your Shopify numbers (for example a long Shopify id), tell the developer the exact format. If they look the same, those orders just have not reached Shiprocket yet.');
+    }
+  }
   return { ok: problems.length === 0, sample, problems };
 }
 

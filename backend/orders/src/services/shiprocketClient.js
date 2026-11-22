@@ -91,7 +91,8 @@ async function getOrderShipment(orderId) {
   if (r.status === 401) throw new ShiprocketError('Shiprocket rejected the login', { status: 401, code: 'auth' });
   if (!r.data) throw new ShiprocketError(`Shiprocket sent an unreadable reply (HTTP ${r.status}): ${detailOf(r.data, r.raw) || 'empty'}`, { status: r.status });
   const list = Array.isArray(r.data.data) ? r.data.data : [];
-  const hit = list.find((x) => bare(x.channel_order_id) === want); // never trust the search: accept only the exact channel order id
+  let hit = list.find((x) => bare(x.channel_order_id) === want); // never trust the search: accept only the exact channel order id
+  if (!hit) { try { hit = (await recentOrders(100)).find((x) => bare(x.channel_order_id) === want); } catch (e) { if (e.code === 'auth') throw e; } } // search missed it: look in the newest orders
   if (!hit) return { found: false, message: detailOf(r.data, r.raw) && !list.length && r.status >= 400 ? detailOf(r.data, r.raw) : 'Order not found in Shiprocket' };
   // The track call is richer (status text, scans, weights). If it fails we still have the list status.
   let track = null;
@@ -104,6 +105,22 @@ async function getOrderShipment(orderId) {
   return { found: true, id: bare(hit.channel_order_id), response: { order: hit, track } };
 }
 
+
+// The newest orders Shiprocket holds, as a plain list. Used by the Settings test (to show what Shiprocket really has) and as a fallback when the
+// search call does not find an order: one list is fetched and kept for 2 minutes, so many "not found" lookups do not each cost a call.
+const mockRecent = () => [3001, 3000, 2999].map((n) => ({ id: 700000 + n, channel_order_id: String(n), status: 'PICKUP SCHEDULED', shipments: [{ id: 800000 + n, awb: `SRMOCK${n}`, courier: 'Delhivery Surface' }] }));
+let recentCache = { at: 0, list: [] };
+async function recentOrders(limit = 100, { fresh = false } = {}) {
+  if (isMock()) return mockRecent();
+  if (!fresh && recentCache.list.length && Date.now() - recentCache.at < 2 * 60000) return recentCache.list;
+  const r = await call('GET', 'orders', { query: { per_page: String(Math.min(limit, 100)), sort: 'DESC', sort_by: 'created_at' } });
+  if (r.status === 401) throw new ShiprocketError('Shiprocket rejected the login', { status: 401, code: 'auth' });
+  const list = r.data && Array.isArray(r.data.data) ? r.data.data : [];
+  recentCache = { at: Date.now(), list };
+  return list;
+}
+const simple = (o) => { const sh = Array.isArray(o.shipments) ? o.shipments.filter((x) => x && (x.awb || x.awb_code)).pop() : o.shipments && (o.shipments.awb || o.shipments.awb_code) ? o.shipments : null; return { channelOrderId: clean(o.channel_order_id), shiprocketId: clean(o.id), status: clean(o.status), awb: clean(sh && (sh.awb || sh.awb_code)), courier: clean(sh && sh.courier) }; };
+
 // Create ONE manifest for these shipments (Shiprocket shipment ids). Shiprocket answers with a PDF link and no manifest id,
 // lib/shiprocketManifest.js reads the reply. Never retried automatically: creating a manifest is not safe to repeat.
 async function createManifest({ shipmentIds }) {
@@ -115,4 +132,4 @@ async function createManifest({ shipmentIds }) {
   return { status: r.status, data: r.data, raw: r.raw };
 }
 
-module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, createManifest, _reset: forgetToken };
+module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, createManifest, recentOrders, simple, _reset: () => { forgetToken(); recentCache = { at: 0, list: [] }; } };
