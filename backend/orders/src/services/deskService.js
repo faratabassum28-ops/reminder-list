@@ -459,6 +459,7 @@ async function dispatchBoard(opts = {}) {
         slip: (d.dq && d.dq.slip) || null, packed: (d.dq && d.dq.packed) || null,
         hold: DP.isHeld(d) ? d.dq.hold : null,
         provider: deskProviderOrNull(d), // null at the packing slip step: not chosen yet
+        shipCheck: d.dq && d.dq.shipCheck && d.dq.shipCheck.state ? d.dq.shipCheck : null, // last Shipway / Shiprocket answer, shown on the Order packed card
         suggestedAwb: (c.shipway && (c.shipway.provider || 'shipway') === PR.providerOf(d) && c.shipway.awb) || '', // from the order's own provider
         suggestedCourier: (c.shipway && (c.shipway.provider || 'shipway') === PR.providerOf(d) && c.shipway.carrier) || '',
         manifest: (d.dq && d.dq.manifest && d.dq.manifest.id) ? d.dq.manifest : null,

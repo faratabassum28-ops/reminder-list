@@ -358,8 +358,8 @@ export function MultiPhotoField({ label, files, setFiles, required, max = 10, hi
         </div>
       )}
       <div className="multi-add">
-        <label className={`btn ghost ${full || busy ? 'off' : ''}`}>📷 {files.length ? 'Take another' : 'Take a photo'}<input type="file" accept="image/*" capture="environment" disabled={full || busy} onChange={add} hidden /></label>
-        <label className={`btn ghost ${full || busy ? 'off' : ''}`}>🖼 Choose photos<input type="file" accept="image/*" multiple disabled={full || busy} onChange={add} hidden /></label>
+        <label className={`btn ghost ${full || busy ? 'is-off' : ''}`}>📷 {files.length ? 'Take another' : 'Take a photo'}<input type="file" accept="image/*" capture="environment" disabled={full || busy} onChange={add} hidden /></label>
+        <label className={`btn ghost ${full || busy ? 'is-off' : ''}`}>🖼 Choose photos<input type="file" accept="image/*" multiple disabled={full || busy} onChange={add} hidden /></label>
       </div>
       {busy && <small className="muted">Preparing photos…</small>}
       {err && <div className="banner err">{err}</div>}

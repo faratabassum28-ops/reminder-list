@@ -536,7 +536,7 @@
 .oa-scope .multi-photos .x {position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; font-size: 13px;}
 .oa-scope .multi-add {display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px;}
 .oa-scope .multi-add .btn {flex: 1 1 150px; min-height: 46px; text-align: center; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;}
-.oa-scope .multi-add .btn.off {opacity: .45; pointer-events: none;}
+.oa-scope .multi-add .btn.is-off {opacity: .45; pointer-events: none;}
 .oa-scope .sd-jump {display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;}
 .oa-scope .sd-jump a {border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 6px 14px; font-weight: 600; text-decoration: none; color: var(--ink-2);}
 .oa-scope .asg-group h3, .oa-scope .names-group h3 {margin: 18px 0 8px; font-size: 15px;}
@@ -934,7 +934,7 @@
 .oa-scope .ship-line.ok {background: color-mix(in srgb, var(--good) 11%, var(--surface)); border-color: color-mix(in srgb, var(--good) 35%, transparent); color: var(--ink);}
 .oa-scope .ship-line.wait {background: color-mix(in srgb, var(--warn) 13%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--ink);}
 .oa-scope .ship-line.bad {background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border-color: color-mix(in srgb, var(--bad) 38%, transparent); color: var(--ink);}
-.oa-scope .ship-line.off {background: var(--line-2); color: var(--ink-3);}
+.oa-scope .ship-line.idle {background: var(--line-2); color: var(--ink-3);}
 .oa-scope .ship-bar {display: grid; gap: 8px; margin-top: 6px;}
 .oa-scope .ship-bar .ship-check {justify-self: start;}
 .oa-scope .ship-chips {display: flex; flex-wrap: wrap; gap: 6px;}
