@@ -202,6 +202,7 @@ const deskOrderSchema = new Schema({
     packed: { at: Date, byName: String, byId: String, awb: String, courier: String, photoId: String, photoIds: [String], dueAt: Date, late: Boolean }, // photoIds: every photo of the package (photoId = the first)
     handover: { at: Date, byName: String, byId: String, manifestId: String, manifestIds: [String], manifestRef: String, dueAt: Date, late: Boolean }, // manifestIds: every photo of the manifest
     manifest: { id: String, courier: String, provider: String, url: String, at: Date, byName: String, byId: String }, // the Shipway / Shiprocket manifest this order was put on (we create it; Shipway cannot list it back)
+    shipCheck: { state: String, status: String, awb: String, courier: String, at: Date }, // last answer from the shipping service for this order, shown on the Order packed card
     manifestError: { message: String, courier: String, at: Date, byName: String }, // Shipway refused this order for a manifest: why; cleared when a manifest later accepts it
     hold: { at: Date, byName: String, byId: String, note: String, step: String }, // set while the order is on hold (deadline paused); cleared on resume or cancel
   },

@@ -166,7 +166,7 @@ function cardOf(desk, shop, conf, ship) {
     dispatch: desk.dispatch && desk.dispatch.at ? desk.dispatch : null, confirmedAt: desk.confirmedAt || null, confirmedAtFu: desk.confirmedAtFu || '',
     shipway: ship ? { status: ship.status, group: ship.group, carrier: ship.carrier, awb: ship.awb, provider: ship.provider || 'shipway' } : null,
     provider: deskProviderOrNull(desk),
-    dq: desk.dq && desk.dq.step ? { step: desk.dq.step, provider: deskProviderOrNull(desk), slip: desk.dq.slip || null, packed: desk.dq.packed || null, handover: desk.dq.handover || null, manifest: desk.dq.manifest && desk.dq.manifest.id ? desk.dq.manifest : null, manifestError: DP.manifestError(desk), hold: desk.dq.hold && desk.dq.hold.at ? desk.dq.hold : null } : null,
+    dq: desk.dq && desk.dq.step ? { step: desk.dq.step, provider: deskProviderOrNull(desk), shipCheck: desk.dq.shipCheck && desk.dq.shipCheck.state ? desk.dq.shipCheck : null, slip: desk.dq.slip || null, packed: desk.dq.packed || null, handover: desk.dq.handover || null, manifest: desk.dq.manifest && desk.dq.manifest.id ? desk.dq.manifest : null, manifestError: DP.manifestError(desk), hold: desk.dq.hold && desk.dq.hold.at ? desk.dq.hold : null } : null,
     refundDue: !!(desk.stage === 'cancelled' && desk.partial && desk.partial.amount),
   };
 }
@@ -488,6 +488,13 @@ async function dispatchSlip(user, orderId, { provider } = {}) {
   const { doc } = await loadForAction(orderId, user);
   const t = DP.slipDone(doc, await getDispatchConfig(), user, new Date(), { provider: chosen });
   return brief(await applyTransition(doc, t));
+}
+
+// Ask the services about every order at "Order packed" and save the answer on each card (lib/shipState.js says what the answers mean).
+async function dispatchCheck() {
+  const sync = require('./shipwaySync');
+  try { return await sync.checkPacked({}); }
+  catch (e) { if (!e.status) e.status = e.code === 'auth' || e.code === 'not_configured' ? 400 : 502; throw e; }
 }
 
 // Move an order at "Order packed" to the other service (see lib/dispatch.js providerChanged).
@@ -935,4 +942,4 @@ function start() {
   }
 }
 
-module.exports = { staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchProvider, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };
+module.exports = { staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchProvider, dispatchCheck, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };

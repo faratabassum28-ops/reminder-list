@@ -27,6 +27,50 @@ function Due({ dueAt, now, offset }) {
   return <span className="sd-due late" title={`Was due ${fmtWhen(dueAt)}`}>Overdue {duration(-ms)}</span>;
 }
 
+// How long ago, in plain words.
+const agoLabel = (at) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000));
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+};
+
+// The answer from Shipway / Shiprocket for one order at Order packed, in plain words with the next step.
+function ShipLine({ o, prov, canAct, busy, onCancel, onSwitch }) {
+  const c = o.dq.shipCheck; const pl = providerLabel(prov || 'shipway');
+  const other = providerLabel((prov || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket');
+  if (!c) return <div className="ship-line off"><span>Not checked yet. Press <b>Check shipping status</b> above, or DONE to look now.</span></div>;
+  const when = <small className="ship-when" title={new Date(c.at).toLocaleString()}>checked {agoLabel(c.at)}</small>;
+  if (c.state === 'awb_ready') return <div className="ship-line ok"><span>✓ <b>AWB ready</b>{c.courier ? ` · ${c.courier}` : ''}{c.awb ? ` · ${c.awb}` : ''}. Press DONE.</span>{when}</div>;
+  if (c.state === 'waiting') return <div className="ship-line wait"><span><b>Waiting for the shipment</b> in {pl}{c.status ? ` (${c.status.toLowerCase()})` : ''}. Create it in {pl} (weight, size, courier), then press DONE.</span>{when}</div>;
+  if (c.state === 'cancelled') return (
+    <div className="ship-line bad"><span><b>Cancelled in {pl}</b>. It will never get an AWB.</span>{when}
+      {canAct && <button className="btn ghost ship-act" disabled={busy} onClick={() => onCancel(o)}>Cancel here too</button>}
+    </div>);
+  if (c.state === 'not_found') return (
+    <div className="ship-line bad"><span><b>Not in {pl}</b>. Was it booked with {other}?</span>{when}
+      {canAct && onSwitch && <button className="btn ghost ship-act" disabled={busy} onClick={() => onSwitch(o)}>⇄ Use {other}</button>}
+    </div>);
+  return <div className="ship-line off"><span>Could not check{c.status ? `: ${c.status}` : ''}. Try again in a minute.</span>{when}</div>;
+}
+
+// Above the Order packed cards: one button to check them all, and filter chips with the counts.
+const SHIP_CHIPS = [['', 'All'], ['awb_ready', '✓ AWB ready'], ['waiting', 'Waiting for shipment'], ['cancelled', 'Cancelled'], ['not_found', 'Not found'], ['unchecked', 'Not checked']];
+const shipKey = (o) => (o.dq.shipCheck && o.dq.shipCheck.state ? (o.dq.shipCheck.state === 'error' ? 'unchecked' : o.dq.shipCheck.state) : 'unchecked');
+function ShipCheckBar({ items, filter, setFilter, onCheck, checking, canCheck }) {
+  const counts = items.reduce((m, o) => { const k = shipKey(o); m[k] = (m[k] || 0) + 1; return m; }, {});
+  const latest = items.reduce((t, o) => (o.dq.shipCheck && o.dq.shipCheck.at && new Date(o.dq.shipCheck.at) > t ? new Date(o.dq.shipCheck.at) : t), new Date(0));
+  return (
+    <div className="ship-bar">
+      {canCheck && <button className="btn good ship-check" disabled={checking || !items.length} onClick={onCheck}>{checking ? 'Checking…' : 'Check shipping status'}</button>}
+      {latest.getTime() > 0 && <small className="muted">Last checked {agoLabel(latest)}. Also refreshes by itself.</small>}
+      {items.length > 0 && (
+        <div className="ship-chips" role="group" aria-label="Filter by shipping status">
+          {SHIP_CHIPS.map(([key, label]) => { const n = key === '' ? items.length : counts[key] || 0; if (key && !n && filter !== key) return null; return <button key={key || 'all'} className={`ship-chip ${key} ${filter === key ? 'on' : ''}`} aria-pressed={filter === key} onClick={() => setFilter(filter === key ? '' : key)}>{label}<b>{n}</b></button>; })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone, onHold, onCancel, onSwitch, onOpen, assign }) {
   const { L } = useLabels();
   const late = o.dq.dueAt && new Date(o.dq.dueAt).getTime() < now + offset;
@@ -45,7 +89,7 @@ function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone
       </header>
       <div className="sd-who"><b>{o.name || 'No name'}</b>{o.city ? <span className="muted"> · {o.city}</span> : null}</div>
       <div className="sd-line"><span className="sd-amt">{inr(o.total)}</span><span className="sd-items" title={o.items}>{o.items || 'Items not loaded'}</span></div>
-      {col.key !== 'slip' && (awb ? <div className="sd-foot"><span>AWB <b>{awb}</b>{courier ? ` · ${courier}` : ''}</span></div> : <div className="sd-foot warn"><span>AWB not in {providerLabel(prov || 'shipway')} yet</span></div>)}
+      {col.key !== 'slip' && (awb ? <div className="sd-foot"><span>AWB <b>{awb}</b>{courier ? ` · ${courier}` : ''}</span></div> : col.key === 'packed' ? <ShipLine o={o} prov={prov} canAct={canAct} busy={busy} onCancel={onCancel} onSwitch={onSwitch} /> : <div className="sd-foot warn"><span>AWB not in {providerLabel(prov || 'shipway')} yet</span></div>)}
       {col.key === 'handover' && o.dq.manifestError && <div className="sd-foot warn" role="alert"><span>{providerLabel(prov || 'shipway')} rejected it for the manifest: <b>{o.dq.manifestError.message}</b></span></div>}
       {o.collect > 0 && Math.round(o.collect) !== Math.round(o.total || 0) && <div className="sd-foot"><span className="sd-collect-tag">Collect {inr(o.collect)}</span></div>}
       {(assign || canAct) && (
@@ -374,6 +418,20 @@ export default function DispatchBoard() {
     if (key === 'handover') return setHanding([o]);
     setSlipping(o); // the slip is marked done inside the sheet, once Shipway or Shiprocket is chosen
   };
+  const [shipFilter, setShipFilter] = useState('');
+  const [checking, setChecking] = useState(false);
+  const runCheck = async () => {
+    setChecking(true);
+    try {
+      const r = await api.post('/desk/dispatch/check');
+      const a = r.summary.all;
+      const parts = [`${a.awb_ready} AWB ready`, `${a.waiting} waiting for shipment`, `${a.cancelled} cancelled`, a.not_found ? `${a.not_found} not found` : '', a.error ? `${a.error} could not be checked` : ''].filter(Boolean);
+      if (r.problems && r.problems.length) show(`Checked ${r.checked}. ${r.problems.join(' | ')}`, 'err');
+      else if (r.notConnected && r.notConnected.length) show(`Checked ${r.checked}: ${parts.join(' · ')}. ${r.notConnected.join(' and ')} is not connected, so ${r.skipped} order${r.skipped === 1 ? ' was' : 's were'} skipped.`, 'err');
+      else show(`Checked ${r.checked} orders: ${parts.join(' · ')}.`);
+      reload();
+    } catch (e) { show(e.message, 'err'); } finally { setChecking(false); }
+  };
   const switchService = async (o) => {
     const to = (o.dq.provider || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket';
     if (!window.confirm(`Move ${o.orderName} to ${providerLabel(to)}? Its AWB will then be read from ${providerLabel(to)}.`)) return;
@@ -397,7 +455,8 @@ export default function DispatchBoard() {
         {data && (
           <div className="dq-board">
             {COLS.map((col) => {
-              const items = col.key === 'handover' ? [] : data.columns[col.key];
+              const allItems = col.key === 'handover' ? [] : data.columns[col.key];
+              const items = col.key === 'packed' && shipFilter ? allItems.filter((o) => shipKey(o) === shipFilter) : allItems;
               const st = conf.stages[col.key];
               return (
                 <div key={col.key} className={`dq-col ${col.key}`}>
@@ -406,6 +465,7 @@ export default function DispatchBoard() {
                       {user.role === 'admin' && <Link className="dq-gear" to="/orders/shopify-desk/settings#dispatch" title={`${L(col.label)} settings`} aria-label={`${L(col.label)} settings`}>⚙</Link>}</div>
                     <span className="dq-when">{whenLabel(st)}</span>
                     <small>{col.hint(L)}</small>
+                    {col.key === 'packed' && <ShipCheckBar items={allItems} filter={shipFilter} setFilter={setShipFilter} onCheck={runCheck} checking={checking} canCheck={actor} />}
                     {data.assign.modes[col.key] !== 'off' && <span className="dq-when asg">{data.assign.modes[col.key] === 'auto' ? 'Shared out automatically' : 'Assigned by an admin'}</span>}
                     {data.assign.modes[col.key] !== 'off' && isAdmin && <Workload items={col.key === 'handover' ? handoverAll : items} />}
                   </div>
@@ -443,7 +503,7 @@ export default function DispatchBoard() {
                         );
                       })
                       : items.length === 0
-                        ? <Empty title="Nothing here">{col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
+                        ? <Empty title={col.key === 'packed' && shipFilter ? 'No orders with this status' : 'Nothing here'}>{col.key === 'packed' && shipFilter ? 'Pick another status above, or press the highlighted one again to show all.' : col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
                         : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />)}
                   </div>
                 </div>

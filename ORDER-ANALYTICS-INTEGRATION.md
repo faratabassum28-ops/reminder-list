@@ -51,3 +51,16 @@ Orders can now ship through **Shipway or Shiprocket**. The packing team chooses 
 - Weights are read as **kg** (`SHIPROCKET_WEIGHT_UNIT=g` to change).
 
 Tests: `cd backend && npm run test:orders` (new: `shiprocket.test.js`, `shiprocketSync.test.js`).
+
+### Order packed: "Check shipping status"
+
+One button above the Order packed cards asks Shipway / Shiprocket about **every** card at once and saves the answer on each card. It also refreshes by itself every 10 minutes for cards not checked in the last 30 minutes. Each card then says one of:
+
+| Card says | Meaning | What to do |
+|---|---|---|
+| ✓ **AWB ready** | The service has made the AWB | Press DONE |
+| **Waiting for the shipment** | The order is there but no shipment exists (Shiprocket status NEW) | Create it in the service (weight, size, courier), then DONE |
+| **Cancelled in …** | Cancelled at the service, it will never get an AWB | *Cancel here too*, or reopen it there |
+| **Not in …** | The service does not have the order | *⇄ Use the other service* |
+
+The chips above the cards (All, AWB ready, Waiting, Cancelled, Not found, Not checked) filter the column. Nothing is created or cancelled automatically: the check only reads.
