@@ -694,7 +694,8 @@ async function transitList(opts = {}) {
   const sBy = new Map(shops.map((x) => [x.orderId, x])); const hBy = new Map(ships.map((x) => [x.orderId, x]));
   const now = Date.now();
   const rows = desks.map((d) => {
-    const h0 = hBy.get(d.orderId); const h = h0 && (h0.provider || 'shipway') === PR.providerOf(d) ? h0 : undefined; // a status left by the other service must not stand in const c = cardOf(d, sBy.get(d.orderId), conf, h);
+    const h0 = hBy.get(d.orderId); const h = h0 && (h0.provider || 'shipway') === PR.providerOf(d) ? h0 : undefined; // a status left by the other service must not stand in
+    const c = cardOf(d, sBy.get(d.orderId), conf, h);
     const at = d.dispatch && d.dispatch.at;
     return {
       orderId: c.orderId, orderName: c.orderName, name: c.name, phone: c.phone, city: c.city, state: c.state, total: c.total, collect: c.collect, payment: c.payment, items: c.items,
