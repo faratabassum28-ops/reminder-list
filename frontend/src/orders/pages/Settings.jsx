@@ -71,12 +71,6 @@ function ShopifyCard() {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null);
   const [result, setResult] = useState(null);
-  const [lookId, setLookId] = useState('');
-  const [look, setLook] = useState(null);
-  const doLook = async () => {
-    setBusy('look'); setLook(null); setMsg(null);
-    try { setLook(await api.post('/shiprocket/lookup', { orderId: lookId })); } catch (e) { setMsg({ ok: false, text: e.message }); } finally { setBusy(''); }
-  };
   const running = !!(data && data.running);
   useEffect(() => { if (!running) return undefined; const t = setInterval(reload, 4000); return () => clearInterval(t); }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   const start = async (full) => {
@@ -191,20 +185,6 @@ function ShipwayCard() {
               <button className="btn ghost" disabled={!!busy || running} onClick={() => start(false)}>Sync now</button>
               <button className="btn ghost" disabled={!!busy || running} onClick={() => start(true)}>Check all orders</button>
             </div>
-            <div className="filters">
-              <input value={lookId} onChange={(e) => setLookId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && lookId.trim() && !busy) doLook(); }} placeholder="Order number, e.g. 2509" aria-label="Order number to look up in Shiprocket" style={{ maxWidth: 220 }} />
-              <button className="btn ghost" disabled={!!busy || !lookId.trim()} onClick={doLook}>{busy === 'look' ? 'Looking…' : 'Look up in Shiprocket'}</button>
-            </div>
-            {look && (
-              <div className={`banner ${look.order && look.order.awb ? '' : 'err'}`}>
-                <b>Order {look.orderId}: {look.order ? `in Shiprocket (${look.order.status || 'no status'})${look.order.awb ? `, AWB ${look.order.awb}${look.order.courier ? `, ${look.order.courier}` : ''}` : ', no AWB'}` : 'not found in Shiprocket'}</b>
-                <ul className="log">
-                  {look.search && <li>Search call: HTTP {look.search.http}, {look.search.returned} result{look.search.returned === 1 ? '' : 's'}{look.search.ids.length ? ` (${look.search.ids.join(', ')})` : ''}, exact match {look.search.exact ? 'yes' : 'no'}.</li>}
-                  {look.scan && <li>Scanned {look.scan.seen} newest orders ({look.scan.newest} down to {look.scan.oldest}): {look.scan.found ? 'found' : 'not found'}.</li>}
-                  {look.hint && <li>{look.hint}</li>}
-                </ul>
-              </div>
-            )}
             {result && (
               <div className={`banner ${result.ok ? '' : 'err'}`}>
                 <b>{result.ok ? 'Connected.' : 'Login works, but something needs fixing.'}</b>
@@ -225,6 +205,12 @@ function ShiprocketCard() {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null);
   const [result, setResult] = useState(null);
+  const [lookId, setLookId] = useState('');
+  const [look, setLook] = useState(null);
+  const doLook = async () => {
+    setBusy('look'); setLook(null); setMsg(null);
+    try { setLook(await api.post('/shiprocket/lookup', { orderId: lookId })); } catch (e) { setMsg({ ok: false, text: e.message }); } finally { setBusy(''); }
+  };
   const running = !!(data && data.running);
   useEffect(() => { if (!running) return undefined; const t = setInterval(reload, 4000); return () => clearInterval(t); }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   const start = async () => {
@@ -258,6 +244,20 @@ function ShiprocketCard() {
               <button className="btn ghost" disabled={!!busy || running} onClick={test}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button>
               <button className="btn ghost" disabled={!!busy || running} onClick={start}>Sync now</button>
             </div>
+            <div className="filters">
+              <input value={lookId} onChange={(e) => setLookId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && lookId.trim() && !busy) doLook(); }} placeholder="Order number, e.g. 2509" aria-label="Order number to look up in Shiprocket" style={{ maxWidth: 220 }} />
+              <button className="btn ghost" disabled={!!busy || !lookId.trim()} onClick={doLook}>{busy === 'look' ? 'Looking…' : 'Look up in Shiprocket'}</button>
+            </div>
+            {look && (
+              <div className={`banner ${look.order && look.order.awb ? '' : 'err'}`}>
+                <b>Order {look.orderId}: {look.order ? `in Shiprocket (${look.order.status || 'no status'})${look.order.awb ? `, AWB ${look.order.awb}${look.order.courier ? `, ${look.order.courier}` : ''}` : ', no AWB'}` : 'not found in Shiprocket'}</b>
+                <ul className="log">
+                  {look.search && <li>Search call: HTTP {look.search.http}, {look.search.returned} result{look.search.returned === 1 ? '' : 's'}{look.search.ids.length ? ` (${look.search.ids.join(', ')})` : ''}, exact match {look.search.exact ? 'yes' : 'no'}.</li>}
+                  {look.scan && <li>Scanned {look.scan.seen} newest orders ({look.scan.newest} down to {look.scan.oldest}): {look.scan.found ? 'found' : 'not found'}.</li>}
+                  {look.hint && <li>{look.hint}</li>}
+                </ul>
+              </div>
+            )}
             {result && (
               <div className={`banner ${result.ok ? '' : 'err'}`}>
                 <b>{result.ok ? 'Connected.' : 'Login works, but something needs fixing.'}</b>
