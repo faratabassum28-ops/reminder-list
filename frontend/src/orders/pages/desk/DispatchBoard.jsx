@@ -37,7 +37,7 @@ const agoLabel = (at) => {
 function ShipLine({ o, prov, canAct, busy, onCancel, onSwitch }) {
   const c = o.dq.shipCheck; const pl = providerLabel(prov || 'shipway');
   const other = providerLabel((prov || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket');
-  if (!c) return <div className="ship-line off"><span>Not checked yet. Press <b>Check shipping status</b> above, or DONE to look now.</span></div>;
+  if (!c) return <div className="ship-line idle"><span>Not checked yet. Press <b>Check shipping status</b> above, or DONE to look now.</span></div>;
   const when = <small className="ship-when" title={new Date(c.at).toLocaleString()}>checked {agoLabel(c.at)}</small>;
   if (c.state === 'awb_ready') return <div className="ship-line ok"><span>✓ <b>AWB ready</b>{c.courier ? ` · ${c.courier}` : ''}{c.awb ? ` · ${c.awb}` : ''}. Press DONE.</span>{when}</div>;
   if (c.state === 'waiting') return <div className="ship-line wait"><span><b>Waiting for the shipment</b> in {pl}{c.status ? ` (${c.status.toLowerCase()})` : ''}. Create it in {pl} (weight, size, courier), then press DONE.</span>{when}</div>;
@@ -49,7 +49,7 @@ function ShipLine({ o, prov, canAct, busy, onCancel, onSwitch }) {
     <div className="ship-line bad"><span><b>Not in {pl}</b>. Was it booked with {other}?</span>{when}
       {canAct && onSwitch && <button className="btn ghost ship-act" disabled={busy} onClick={() => onSwitch(o)}>⇄ Use {other}</button>}
     </div>);
-  return <div className="ship-line off"><span>Could not check{c.status ? `: ${c.status}` : ''}. Try again in a minute.</span>{when}</div>;
+  return <div className="ship-line idle"><span>Could not check{c.status ? `: ${c.status}` : ''}. Try again in a minute.</span>{when}</div>;
 }
 
 // Above the Order packed cards: one button to check them all, and filter chips with the counts.
