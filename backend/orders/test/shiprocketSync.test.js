@@ -150,3 +150,33 @@ test('client: recentOrders is shown in a plain shape for the Settings test', asy
   const list = (await rocket.recentOrders(10, { fresh: true })).map(rocket.simple);
   assert.deepEqual(list.find((x) => x.channelOrderId === '2919'), { channelOrderId: '2919', shiprocketId: '9001', status: 'PICKUP SCHEDULED', awb: 'SR123456', courier: 'Delhivery Surface' });
 });
+
+test('client: an old order is found by scanning deeper pages when the search does not match it', async () => {
+  rocket._reset();
+  const mk = (n) => ({ id: n, channel_order_id: String(n), status: 'NEW', shipments: [] });
+  const page1 = Array.from({ length: 100 }, (_, i) => mk(3945 - i)); // 3945 .. 3846: a full first page that does not hold 2919
+  const page2 = [ORDER, ...Array.from({ length: 20 }, (_, i) => mk(2800 - i))]; // 2919 is on page 2
+  fake((u) => {
+    if (u.pathname.endsWith('/auth/login')) return json({ token: 'T' });
+    if (u.pathname.endsWith('/orders')) return json({ data: u.searchParams.get('search') ? [] : u.searchParams.get('page') === '2' ? page2 : page1 });
+    if (u.pathname.includes('/courier/track/awb/')) return json(TRACK);
+    return json({}, 404);
+  });
+  const r = await rocket.getOrderShipment(2919);
+  assert.equal(r.found, true);
+  assert.equal(r.response.order.id, 9001);
+});
+
+test('diagnoseOrder explains where an order was or was not found', async () => {
+  rocket._reset(); fake(api);
+  const ok = await rocket.diagnoseOrder('#2919');
+  assert.equal(ok.search.exact, true); assert.equal(ok.order.awb, 'SR123456'); assert.equal(ok.hint, '');
+  rocket._reset();
+  fake((u) => (u.pathname.endsWith('/auth/login') ? json({ token: 'T' }) : json({ data: [{ id: 1, channel_order_id: '3000', status: 'NEW', shipments: [] }] })));
+  const miss = await rocket.diagnoseOrder('2509');
+  assert.equal(miss.order, null); assert.match(miss.hint, /not in Shiprocket|older than that/);
+  rocket._reset();
+  fake((u) => (u.pathname.endsWith('/auth/login') ? json({ token: 'T' }) : json({ data: [{ id: 5, channel_order_id: '2509', status: 'NEW', shipments: [] }] })));
+  const noAwb = await rocket.diagnoseOrder('2509');
+  assert.equal(noAwb.order.awb, ''); assert.match(noAwb.hint, /no AWB yet/);
+});

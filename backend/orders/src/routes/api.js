@@ -97,6 +97,7 @@ const shipWrap = (fn) => wrap(async (req, res) => {
 router.get('/shipway/status', wrap(async (req, res) => res.json({ ...(await shipway.status()), groups: SHIPWAY_GROUPS })));
 router.post('/shipway/test', shipWrap(async (req, res) => res.json(await shipway.test())));
 router.get('/shiprocket/status', wrap(async (req, res) => { const st = await shipway.status(); res.json({ ...st.shiprocket, running: st.running, progress: st.progress, total: st.total, last: st.last, groups: SHIPWAY_GROUPS }); }));
+router.post('/shiprocket/lookup', shipWrap(async (req, res) => { const id = String((req.body && req.body.orderId) || '').replace(/^#/, '').trim(); if (!/^\d{1,10}$/.test(id)) return res.status(400).json({ error: 'Type an order number, for example 2509' }); res.json(await rocket.diagnoseOrder(id)); }));
 router.post('/shiprocket/test', shipWrap(async (req, res) => res.json(await shipway.testShiprocket())));
 router.post('/shipway/sync', shipWrap(async (req, res) => {
   const st = await shipway.status();
