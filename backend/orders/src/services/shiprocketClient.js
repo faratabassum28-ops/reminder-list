@@ -92,7 +92,7 @@ async function getOrderShipment(orderId) {
   if (!r.data) throw new ShiprocketError(`Shiprocket sent an unreadable reply (HTTP ${r.status}): ${detailOf(r.data, r.raw) || 'empty'}`, { status: r.status });
   const list = Array.isArray(r.data.data) ? r.data.data : [];
   let hit = list.find((x) => bare(x.channel_order_id) === want); // never trust the search: accept only the exact channel order id
-  if (!hit) { try { hit = (await recentOrders(100)).find((x) => bare(x.channel_order_id) === want); } catch (e) { if (e.code === 'auth') throw e; } } // search missed it: look in the newest orders
+  if (!hit) { try { hit = (await recentOrders(SCAN_PAGES * 100, { pages: SCAN_PAGES })).find((x) => bare(x.channel_order_id) === want); } catch (e) { if (e.code === 'auth') throw e; } } // search missed it: look through the newest orders
   if (!hit) return { found: false, message: detailOf(r.data, r.raw) && !list.length && r.status >= 400 ? detailOf(r.data, r.raw) : 'Order not found in Shiprocket' };
   // The track call is richer (status text, scans, weights). If it fails we still have the list status.
   let track = null;
@@ -109,15 +109,47 @@ async function getOrderShipment(orderId) {
 // The newest orders Shiprocket holds, as a plain list. Used by the Settings test (to show what Shiprocket really has) and as a fallback when the
 // search call does not find an order: one list is fetched and kept for 2 minutes, so many "not found" lookups do not each cost a call.
 const mockRecent = () => [3001, 3000, 2999].map((n) => ({ id: 700000 + n, channel_order_id: String(n), status: 'PICKUP SCHEDULED', shipments: [{ id: 800000 + n, awb: `SRMOCK${n}`, courier: 'Delhivery Surface' }] }));
-let recentCache = { at: 0, list: [] };
-async function recentOrders(limit = 100, { fresh = false } = {}) {
+let recentCache = { at: 0, pages: 0, list: [] };
+// pages of 100, newest first, stopping early when a page comes back short. Kept for 2 minutes per depth, so many "not found" lookups share one scan.
+async function recentOrders(limit = 100, { fresh = false, pages } = {}) {
   if (isMock()) return mockRecent();
-  if (!fresh && recentCache.list.length && Date.now() - recentCache.at < 2 * 60000) return recentCache.list;
-  const r = await call('GET', 'orders', { query: { per_page: String(Math.min(limit, 100)), sort: 'DESC', sort_by: 'created_at' } });
-  if (r.status === 401) throw new ShiprocketError('Shiprocket rejected the login', { status: 401, code: 'auth' });
-  const list = r.data && Array.isArray(r.data.data) ? r.data.data : [];
-  recentCache = { at: Date.now(), list };
-  return list;
+  const want = pages || Math.max(1, Math.ceil(limit / 100));
+  if (!fresh && recentCache.pages >= want && recentCache.list.length && Date.now() - recentCache.at < 2 * 60000) return recentCache.list;
+  const all = [];
+  for (let page = 1; page <= want; page++) {
+    const r = await call('GET', 'orders', { query: { per_page: '100', page: String(page), sort: 'DESC', sort_by: 'created_at' } });
+    if (r.status === 401) throw new ShiprocketError('Shiprocket rejected the login', { status: 401, code: 'auth' });
+    const list = r.data && Array.isArray(r.data.data) ? r.data.data : [];
+    all.push(...list);
+    if (list.length < 100) break;
+  }
+  recentCache = { at: Date.now(), pages: want, list: all };
+  return all;
+}
+const SCAN_PAGES = 6; // up to 600 of the newest orders
+
+// Everything Shiprocket says about one order number, step by step, for the Settings "Look up an order" box.
+async function diagnoseOrder(orderId) {
+  const want = bare(orderId);
+  const out = { orderId: want, search: null, scan: null, order: null, hint: '' };
+  if (isMock()) { const o = mockOrder(want); out.search = { http: 200, returned: o ? 1 : 0, ids: o ? [want] : [], exact: !!o }; out.scan = { seen: 3, newest: '3001', oldest: '2999', found: !!o }; out.order = o ? simple(o) : null; out.hint = o ? '' : 'Demo mode: orders ending in 4 or 9 have no AWB.'; return out; }
+  const r = await call('GET', 'orders', { query: { search: want, per_page: '25' } });
+  const sl = r.data && Array.isArray(r.data.data) ? r.data.data : [];
+  const hitS = sl.find((x) => bare(x.channel_order_id) === want);
+  out.search = { http: r.status, returned: sl.length, ids: sl.slice(0, 5).map((x) => bare(x.channel_order_id)), exact: !!hitS };
+  let hit = hitS;
+  if (!hit) {
+    const list = await recentOrders(SCAN_PAGES * 100, { fresh: true, pages: SCAN_PAGES });
+    hit = list.find((x) => bare(x.channel_order_id) === want);
+    const ids = list.map((x) => bare(x.channel_order_id));
+    out.scan = { seen: list.length, newest: ids[0] || '', oldest: ids[ids.length - 1] || '', found: !!hit };
+  }
+  out.order = hit ? simple(hit) : null;
+  if (!hit) out.hint = out.scan && out.scan.seen >= SCAN_PAGES * 100
+    ? `Not in the newest ${out.scan.seen} Shiprocket orders (they run from ${out.scan.newest} down to ${out.scan.oldest}). This order is older than that, or was never sent to Shiprocket.`
+    : `Not found among the ${out.scan ? out.scan.seen : 0} orders Shiprocket holds. This order is not in Shiprocket under that number.`;
+  else if (!out.order.awb) out.hint = 'The order is in Shiprocket but has no AWB yet. Create the shipment there (courier assigned), then try again.';
+  return out;
 }
 const simple = (o) => { const sh = Array.isArray(o.shipments) ? o.shipments.filter((x) => x && (x.awb || x.awb_code)).pop() : o.shipments && (o.shipments.awb || o.shipments.awb_code) ? o.shipments : null; return { channelOrderId: clean(o.channel_order_id), shiprocketId: clean(o.id), status: clean(o.status), awb: clean(sh && (sh.awb || sh.awb_code)), courier: clean(sh && sh.courier) }; };
 
@@ -132,4 +164,4 @@ async function createManifest({ shipmentIds }) {
   return { status: r.status, data: r.data, raw: r.raw };
 }
 
-module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, createManifest, recentOrders, simple, _reset: () => { forgetToken(); recentCache = { at: 0, list: [] }; } };
+module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, createManifest, recentOrders, diagnoseOrder, simple, _reset: () => { forgetToken(); recentCache = { at: 0, pages: 0, list: [] }; } };
