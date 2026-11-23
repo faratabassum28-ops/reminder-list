@@ -9,7 +9,7 @@
  *
  * Bump VERSION to invalidate every cache.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = "msl-shell-" + VERSION;
 const ASSETS = "msl-assets-" + VERSION;
 const PRECACHE = ["/", "/offline.html", "/favicon.svg"];
@@ -57,9 +57,13 @@ async function cacheFirst(request) {
   const cache = await caches.open(ASSETS);
   const hit = await cache.match(request);
   if (hit) return hit;
-  const res = await fetch(request);
-  if (res && res.ok) cache.put(request, res.clone());
-  return res;
+  try {
+    const res = await fetch(request);
+    if (res && res.ok) cache.put(request, res.clone());
+    return res;
+  } catch (err) {
+    return Response.error(); // always resolve to a Response, never reject
+  }
 }
 
 async function staleWhileRevalidate(request) {
@@ -70,7 +74,7 @@ async function staleWhileRevalidate(request) {
       if (res && res.ok) cache.put(request, res.clone());
       return res;
     })
-    .catch(() => hit);
+    .catch(() => hit || Response.error()); // was `hit`, which is undefined on a cache miss
   return hit || network;
 }
 
@@ -81,7 +85,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/sw.js") return;
 
-  if (request.mode === "navigate") return event.respondWith(navigate(request));
+  // Only handle navigations, hashed assets and plain static files. Anything else
+  // (page URLs fetched by script, prefetches, etc.) goes straight to the network.
+  if (request.mode === "navigate") return event.respondWith(navigate(request).catch(() => Response.error()));
   if (url.pathname.startsWith("/assets/")) return event.respondWith(cacheFirst(request));
-  event.respondWith(staleWhileRevalidate(request));
+  if (/\.\w+$/.test(url.pathname)) return event.respondWith(staleWhileRevalidate(request));
 });
