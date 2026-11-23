@@ -925,3 +925,24 @@
 .oa-scope[data-oa-theme="dark"] .prov-tag.shiprocket {background: rgba(160, 110, 230, .18); color: #cbb0f2; border-color: rgba(160, 110, 230, .45);}
 .oa-scope[data-oa-theme="dark"] .prov-pick button.shipway:hover:not(:disabled), .oa-scope[data-oa-theme="dark"] .prov-pick button.shipway:focus-visible {background: rgba(79, 140, 230, .12);}
 .oa-scope[data-oa-theme="dark"] .prov-pick button.shiprocket:hover:not(:disabled), .oa-scope[data-oa-theme="dark"] .prov-pick button.shiprocket:focus-visible {background: rgba(160, 110, 230, .14);}
+
+/* ---- Order packed: shipping status line on each card, and the check bar ---- */
+.oa-scope .ship-line {display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.35; border: 1px solid transparent; margin-top: 2px;}
+.oa-scope .ship-line > span {flex: 1 1 200px; min-width: 0;}
+.oa-scope .ship-line .ship-when {color: var(--ink-3); font-size: 11px; white-space: nowrap;}
+.oa-scope .ship-line .ship-act {padding: 4px 10px; font-size: 12px; min-height: 0;}
+.oa-scope .ship-line.ok {background: color-mix(in srgb, var(--good) 11%, var(--surface)); border-color: color-mix(in srgb, var(--good) 35%, transparent); color: var(--ink);}
+.oa-scope .ship-line.wait {background: color-mix(in srgb, var(--warn) 13%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--ink);}
+.oa-scope .ship-line.bad {background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border-color: color-mix(in srgb, var(--bad) 38%, transparent); color: var(--ink);}
+.oa-scope .ship-line.off {background: var(--line-2); color: var(--ink-3);}
+.oa-scope .ship-bar {display: grid; gap: 8px; margin-top: 6px;}
+.oa-scope .ship-bar .ship-check {justify-self: start;}
+.oa-scope .ship-chips {display: flex; flex-wrap: wrap; gap: 6px;}
+.oa-scope .ship-chip {border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 99px; padding: 4px 11px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;}
+.oa-scope .ship-chip b {margin-left: 6px; font-weight: 800; color: var(--ink);}
+.oa-scope .ship-chip:hover {border-color: var(--ink-3);}
+.oa-scope .ship-chip.on {background: var(--ink-solid); border-color: var(--ink-solid); color: #fff;}
+.oa-scope .ship-chip.on b {color: #fff;}
+.oa-scope .ship-chip.awb_ready {border-color: color-mix(in srgb, var(--good) 45%, var(--line));}
+.oa-scope .ship-chip.waiting {border-color: color-mix(in srgb, var(--warn) 50%, var(--line));}
+.oa-scope .ship-chip.cancelled, .oa-scope .ship-chip.not_found {border-color: color-mix(in srgb, var(--bad) 45%, var(--line));}

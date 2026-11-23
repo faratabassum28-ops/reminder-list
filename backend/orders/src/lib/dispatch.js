@@ -150,7 +150,7 @@ function providerChanged(doc, input = {}, who = { id: 'system', name: 'System' }
   const to = cleanProvider(input.provider);
   const from = PR.providerOf(doc);
   if (to === from) throw httpErr(409, `Order #${doc.orderId} already ships through ${PR.labelOf(to)}.`);
-  const dq = { ...(doc.dq || {}), provider: { name: to, at: now, byName: who.name, byId: who.id, from } };
+  const dq = { ...(doc.dq || {}), provider: { name: to, at: now, byName: who.name, byId: who.id, from }, shipCheck: null }; // the saved answer was from the other service
   return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'provider_switch', label: `Switched from ${PR.labelOf(from)} to ${PR.labelOf(to)}` }] };
 }
 

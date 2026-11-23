@@ -148,7 +148,8 @@ async function diagnoseOrder(orderId) {
   if (!hit) out.hint = out.scan && out.scan.seen >= SCAN_PAGES * 100
     ? `Not in the newest ${out.scan.seen} Shiprocket orders (they run from ${out.scan.newest} down to ${out.scan.oldest}). This order is older than that, or was never sent to Shiprocket.`
     : `Not found among the ${out.scan ? out.scan.seen : 0} orders Shiprocket holds. This order is not in Shiprocket under that number.`;
-  else if (!out.order.awb) out.hint = 'The order is in Shiprocket but has no AWB yet. Create the shipment there (courier assigned), then try again.';
+  else if (/cancel/i.test(out.order.status)) out.hint = 'This order is CANCELLED in Shiprocket, so it will never get an AWB. Cancel it here too, or reopen it in Shiprocket.';
+  else if (!out.order.awb) out.hint = 'The order is in Shiprocket but has no AWB yet. Create the shipment there (add weight and size, choose a courier), then try again.';
   return out;
 }
 const simple = (o) => { const sh = Array.isArray(o.shipments) ? o.shipments.filter((x) => x && (x.awb || x.awb_code)).pop() : o.shipments && (o.shipments.awb || o.shipments.awb_code) ? o.shipments : null; return { channelOrderId: clean(o.channel_order_id), shiprocketId: clean(o.id), status: clean(o.status), awb: clean(sh && (sh.awb || sh.awb_code)), courier: clean(sh && sh.courier) }; };

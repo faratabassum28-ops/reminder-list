@@ -6,6 +6,7 @@ const { Order, ShipwayShipment, DeskOrder, Setting } = require('../models');
 const { normalizeShipment, pickCandidates } = require('../lib/shipwayMap');
 const { fromShiprocket, normalizeShiprocket } = require('../lib/shiprocketMap');
 const P = require('../lib/providers');
+const SS = require('../lib/shipState');
 const client = require('./shipwayClient');
 const rocket = require('./shiprocketClient');
 
@@ -125,6 +126,72 @@ async function ensureFresh(orderId, maxAgeMin = 10) {
   return have;
 }
 
+
+// ---------------------------------------------------------------------------- shipping status of the orders at "Order packed"
+const clean = (v) => (v === undefined || v === null ? '' : String(v).trim());
+const checkState = { runningSince: 0 };
+const checkRunning = () => !!checkState.runningSince && Date.now() - checkState.runningSince < STALE_MS;
+
+// One order, one service -> { state, status, awb, courier } (see lib/shipState.js). Login and setup problems are thrown; anything else becomes state "error".
+async function shipState(orderId, provider) {
+  try {
+    if (provider === 'shiprocket') {
+      const r = await rocket.getOrderShipment(orderId);
+      if (!r.found) return { state: 'not_found', status: '' };
+      const o = r.response.order;
+      const shaped = fromShiprocket(o, r.response.track);
+      const status = clean(shaped && shaped.current_status) || clean(o.status);
+      const state = SS.classify({ found: true, status: `${clean(o.status)} ${status}`, hasAwb: !!(shaped && shaped.awbno) });
+      return { state, status: clean(o.status) || status, awb: (shaped && shaped.awbno) || '', courier: (shaped && shaped.carrier) || '' };
+    }
+    const r = await client.getOrderShipmentDetails(orderId);
+    if (!r.found) return { state: 'not_found', status: '' };
+    const d = normalizeShipment(r.response, r.id);
+    return { state: SS.classify({ found: true, status: d.status, hasAwb: !!d.awb, group: d.group }), status: d.status, awb: d.awb || '', courier: d.carrier || '' };
+  } catch (e) {
+    if (e.code === 'auth' || e.code === 'not_configured') { e.provider = provider; throw e; }
+    return { state: 'error', status: e.message };
+  }
+}
+
+// Ask the right service about every order at "Order packed" and save the answer on the order (dq.shipCheck), so the card shows it.
+// onlyStale: skip orders checked in the last 30 minutes (the background run). A login problem stops that service only; the other carries on.
+async function checkPacked({ onlyStale = false, limit = 300 } = {}) {
+  if (!anyConfigured()) throw Object.assign(new Error('Neither Shipway nor Shiprocket is set up yet. Add a login on the server.'), { status: 400 });
+  if (checkRunning()) throw Object.assign(new Error('A shipping status check is already running. Try again in a moment.'), { status: 409 });
+  checkState.runningSince = Date.now();
+  try {
+    let docs = await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'packed' }).select('orderId dq.provider dq.shipCheck').lean();
+    if (onlyStale) docs = docs.filter((d) => SS.isStale(d.dq && d.dq.shipCheck));
+    const all = docs.map((d) => ({ orderId: d.orderId, provider: P.providerOf(d) }));
+    const skipped = all.filter((w) => !configured(w.provider));
+    const work = all.filter((w) => configured(w.provider)).slice(0, limit);
+    const rows = []; const dead = new Map(); const queue = [...work];
+    const worker = async () => {
+      while (queue.length) {
+        const w = queue.shift();
+        if (dead.has(w.provider)) continue;
+        try {
+          const r = await shipState(w.orderId, w.provider);
+          const at = new Date();
+          // only write if the card is still at Order packed with the same service: it may have been switched or moved on meanwhile
+          const filter = { orderId: w.orderId, stage: 'dispatch', 'dq.step': 'packed', ...(w.provider === 'shiprocket' ? { 'dq.provider.name': 'shiprocket' } : { 'dq.provider.name': { $ne: 'shiprocket' } }) };
+          await DeskOrder.updateOne(filter, { $set: { 'dq.shipCheck': { state: r.state, status: r.status || '', awb: r.awb || '', courier: r.courier || '', at } } });
+          rows.push({ orderId: w.orderId, provider: w.provider, state: r.state });
+        } catch (e) { dead.set(w.provider, e); }
+        await sleep(100);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    if (dead.size && !rows.length) throw [...dead.values()][0];
+    return {
+      checked: rows.length, skipped: skipped.length, at: new Date(), summary: SS.summarise(rows),
+      problems: [...dead.entries()].map(([p, e]) => `${P.labelOf(p)}: ${e.message}`),
+      notConnected: [...new Set(skipped.map((w) => P.labelOf(w.provider)))],
+    };
+  } finally { checkState.runningSince = 0; }
+}
+
 async function status() {
   const [last, count, byGroup, byProvider] = await Promise.all([
     getSetting(LAST_KEY),
@@ -191,10 +258,11 @@ async function testShiprocket() {
 function start() {
   if (!anyConfigured()) { console.log('[shipway/shiprocket] neither is configured (SHIPWAY_USERNAME / SHIPWAY_LICENSE_KEY, SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD): skipped'); return; }
   const every = Math.min(...[cfg.shipway.syncIntervalMin, cfg.shiprocket.syncIntervalMin].filter((n) => n > 0), Infinity);
-  const tick = () => run({ limit: 300 }).catch((e) => { if (e.status !== 409) console.warn('[shipway/shiprocket] sync failed:', e.message); });
+  const tick = () => run({ limit: 300 }).catch((e) => { if (e.status !== 409) console.warn('[shipway/shiprocket] sync failed:', e.message); })
+    .then(() => checkPacked({ onlyStale: true, limit: 40 })).catch((e) => { if (e.status !== 409) console.warn('[shipping check] failed:', e.message); }); // keeps the Order packed cards current
   setTimeout(tick, 20000);
   if (Number.isFinite(every)) setInterval(tick, every * 60 * 1000);
   console.log(`[tracking] ${client.isConfigured() ? `Shipway as ${cfg.shipway.username}` : 'Shipway off'}, ${rocket.isConfigured() ? `Shiprocket as ${cfg.shiprocket.email || 'mock'}` : 'Shiprocket off'}${Number.isFinite(every) ? `, refreshing every ${every} min` : ''}`);
 }
 
-module.exports = { run, refreshOne, ensureFresh, status, test, testShiprocket, start, providerFor, lookup };
+module.exports = { run, refreshOne, shipState, checkPacked, ensureFresh, status, test, testShiprocket, start, providerFor, lookup };
