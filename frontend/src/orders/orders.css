@@ -559,7 +559,10 @@
 .oa-scope .names-row span {font-weight: 600;}
 .oa-scope .names-row small {display: block; color: var(--ink-3); font-weight: 400;}
 @media (max-width: 1100px) {
-.oa-scope .dq-board {grid-template-columns: 1fr;}
+.oa-scope .dq-board, .oa-scope .dq-layout {grid-template-columns: 1fr;}
+}
+@media (max-width: 700px) {
+.oa-scope .dq-pcols {grid-template-columns: 1fr;}
 }
 @media (max-width: 860px) {
 .oa-scope .sd-top, .oa-scope .sd-tabs, .oa-scope .sd-body, .oa-scope .sd > section {padding-left: 14px; padding-right: 14px;}
@@ -791,8 +794,8 @@
 .oa-scope .fn-id b {font-size: 13px;}
 .oa-scope .fn-id small {font-size: 11px; color: var(--ink-3);}
 .oa-scope .fn-id:hover {border-color: var(--accent, #1c5fd4);}
-.oa-scope .dq-side {justify-content: space-between; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 4px;}
-.oa-scope .dq-side .btn {min-height: 34px; font-size: 13px; padding: 4px 10px;}
+.oa-scope .dq-actions {display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 4px;}
+.oa-scope .dq-actions .btn {flex: 1 1 0; min-width: 0; min-height: 30px; padding: 3px 6px; font-size: 12px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .oa-scope .dq-hold {color: #8a5a0c;}
 .oa-scope .dq-cancel {color: var(--cancel);}
 .oa-scope .dq-holdbox {margin-top: 14px; border-top-color: #b7791f;}
@@ -908,14 +911,18 @@
 .oa-scope .prov-pick button.shipway:hover:not(:disabled), .oa-scope .prov-pick button.shipway:focus-visible {border-color: #2f6fcb; background: #eef5fd;}
 .oa-scope .prov-pick button.shiprocket:hover:not(:disabled), .oa-scope .prov-pick button.shiprocket:focus-visible {border-color: #8a4fd6; background: #f6f0fd;}
 .oa-scope .prov-pick button:disabled {opacity: .6; cursor: progress;}
-/* Order handover: two halves, one per service */
-.oa-scope .dq-side {display: grid; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); min-width: 0;}
-.oa-scope .dq-side.shipway {border-top: 4px solid #2f6fcb;}
-.oa-scope .dq-side.shiprocket {border-top: 4px solid #8a4fd6;}
-.oa-scope .dq-sidehead {display: flex; align-items: center; gap: 8px; flex-wrap: wrap;}
-.oa-scope .dq-sidehead h3 {margin: 0; font-size: 15px;}
-.oa-scope .dq-sidehead .sd-count {margin-left: 2px;}
-.oa-scope .dq-sidecards {display: grid; gap: 12px; min-width: 0;}
+/* Dispatch: Packing slip on the left, then one board per service (Shipway, Shiprocket), each with its own Order packed and Order handover */
+.oa-scope .dq-layout {display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.3fr); gap: 14px; align-items: start;}
+.oa-scope .dq-boards {display: grid; gap: 14px; min-width: 0;}
+.oa-scope .dq-pboard {display: grid; gap: 12px; min-width: 0; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); border-top: 6px solid #2f6fcb;}
+.oa-scope .dq-pboard.shiprocket {border-top-color: #8a4fd6;}
+.oa-scope .dq-pboard-head {display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;}
+.oa-scope .dq-pboard-head h2 {margin: 0; font-size: 19px; letter-spacing: -.01em;}
+.oa-scope .dq-pboard.shipway .dq-pboard-head h2 {color: #1b4f8f;}
+.oa-scope .dq-pboard.shiprocket .dq-pboard-head h2 {color: #5b2a99;}
+.oa-scope .dq-pcols {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start;}
+.oa-scope[data-oa-theme="dark"] .dq-pboard.shipway .dq-pboard-head h2 {color: #9cc2f5;}
+.oa-scope[data-oa-theme="dark"] .dq-pboard.shiprocket .dq-pboard-head h2 {color: #cbb0f2;}
 .oa-scope .dq-off {color: var(--warn); font-size: 12px; font-weight: 600;}
 .oa-scope .prov-filter {display: flex; gap: 6px; flex-wrap: wrap; align-items: center;}
 .oa-scope .prov-filter button {border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer;}

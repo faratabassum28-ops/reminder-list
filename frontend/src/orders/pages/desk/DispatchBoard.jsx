@@ -11,9 +11,9 @@ import { AssigneeRow, Empty, MultiPhotoField, OrderDrawer, PayTag, WhoFilter, Wo
 
 // The three columns of the Dispatch queue, left to right. "done" is the button label on the card.
 const COLS = [
-  { key: 'slip', label: 'stepSlip', hint: (L) => `Print the slip and stick it on the box. ${L('btnDone')} asks whether it ships from Shipway or Shiprocket.` },
-  { key: 'packed', label: 'stepPacked', hint: (L) => `Pack the box. The AWB comes from the service you chose at the slip (Shipway or Shiprocket).` },
-  { key: 'handover', label: 'stepHandover', hint: (L) => `Two parts: Shipway orders and Shiprocket orders. Create a manifest per courier in each, then hand over each manifest group with one photo.` },
+  { key: 'slip', label: 'stepSlip', hint: (L) => `Print the slip and stick it on the box. ${L('btnDone')} asks whether it ships from Shipway or Shiprocket, then the order moves to that service's own board.` },
+  { key: 'packed', label: 'stepPacked', hint: (L, pl) => `Pack the box. The AWB comes from ${pl}.` },
+  { key: 'handover', label: 'stepHandover', hint: (L, pl) => `Create a ${pl} manifest per courier, then hand over each manifest group with one photo.` },
 ];
 const hm = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 const whenLabel = (conf) => (conf.dayOffset === 0 ? `Working day ${hm(conf.dueTime)}` : `${conf.dayOffset} working day${conf.dayOffset === 1 ? '' : 's'} later, ${hm(conf.dueTime)}`);
@@ -99,10 +99,10 @@ function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone
         </div>
       )}
       {canAct && (
-        <div className="dq-row dq-side">
-          <button className="btn ghost dq-hold" disabled={busy} onClick={() => onHold(o)}>⏸ Hold</button>
-          <button className="btn ghost dq-cancel" disabled={busy} onClick={() => onCancel(o)}>Cancel order</button>
-          {col.key === 'packed' && onSwitch && <button className="btn ghost" disabled={busy} onClick={() => onSwitch(o)} title="Booked with the other service? Move this order to it.">⇄ Use {providerLabel(prov === 'shiprocket' ? 'shipway' : 'shiprocket')}</button>}
+        <div className="dq-row dq-actions">
+          <button className="btn ghost dq-hold" disabled={busy} onClick={() => onHold(o)} title="Put this order on hold">⏸ Hold</button>
+          <button className="btn ghost dq-cancel" disabled={busy} onClick={() => onCancel(o)} title="Cancel this order">Cancel order</button>
+          {col.key === 'packed' && onSwitch && <button className="btn ghost dq-use" disabled={busy} onClick={() => onSwitch(o)} title="Booked with the other service? Move this order to it.">⇄ Use {providerLabel(prov === 'shiprocket' ? 'shipway' : 'shiprocket')}</button>}
         </div>
       )}
     </article>
@@ -124,7 +124,7 @@ function HeldCard({ o, now, offset, canAct, busy, onResume, onCancel, onOpen }) 
       <div className="sd-line"><span className="sd-amt">{inr(o.total)}</span><span className="sd-items" title={o.items}>{o.items || 'Items not loaded'}</span></div>
       <div className="dq-note"><b>Note</b> “{h.note}”<span className="muted"> · {h.byName}, {fmtWhen(h.at)} · was at {L(STEP_KEYS[h.step] || 'stepSlip')}</span></div>
       {canAct && (
-        <div className="dq-row dq-side">
+        <div className="dq-row dq-actions">
           <button className="btn good dq-resume" disabled={busy} onClick={() => onResume(o)}>▶ Resume</button>
           <button className="btn ghost dq-cancel" disabled={busy} onClick={() => onCancel(o)}>Cancel order</button>
         </div>
@@ -418,19 +418,20 @@ export default function DispatchBoard() {
     if (key === 'handover') return setHanding([o]);
     setSlipping(o); // the slip is marked done inside the sheet, once Shipway or Shiprocket is chosen
   };
-  const [shipFilter, setShipFilter] = useState('');
-  const [checking, setChecking] = useState(false);
-  const runCheck = async () => {
-    setChecking(true);
+  const [shipFilters, setShipFilters] = useState({ shipway: '', shiprocket: '' }); // the status chips of each board are independent
+  const [view, setView] = useState(''); // '' = both boards, or one service
+  const [checking, setChecking] = useState('');
+  const runCheck = async (provider) => {
+    setChecking(provider);
     try {
-      const r = await api.post('/desk/dispatch/check');
+      const r = await api.post('/desk/dispatch/check', { provider });
       const a = r.summary.all;
       const parts = [`${a.awb_ready} AWB ready`, `${a.waiting} waiting for shipment`, `${a.cancelled} cancelled`, a.not_found ? `${a.not_found} not found` : '', a.error ? `${a.error} could not be checked` : ''].filter(Boolean);
       if (r.problems && r.problems.length) show(`Checked ${r.checked}. ${r.problems.join(' | ')}`, 'err');
       else if (r.notConnected && r.notConnected.length) show(`Checked ${r.checked}: ${parts.join(' · ')}. ${r.notConnected.join(' and ')} is not connected, so ${r.skipped} order${r.skipped === 1 ? ' was' : 's were'} skipped.`, 'err');
       else show(`Checked ${r.checked} orders: ${parts.join(' · ')}.`);
       reload();
-    } catch (e) { show(e.message, 'err'); } finally { setChecking(false); }
+    } catch (e) { show(e.message, 'err'); } finally { setChecking(''); }
   };
   const switchService = async (o) => {
     const to = (o.dq.provider || 'shipway') === 'shiprocket' ? 'shipway' : 'shiprocket';
@@ -442,73 +443,101 @@ export default function DispatchBoard() {
   const finish = (setter) => () => { setter(null); setHandingManifest(null); setPicked([]); reload(); };
   const held = data ? data.hold || [] : [];
 
+  const lateN = (arr) => arr.filter((o) => o.dq.dueAt && new Date(o.dq.dueAt).getTime() < now + offset).length;
+  const provOf = (o) => o.dq.provider || 'shipway';
+  const assignFor = (key) => (data.assign.modes[key] !== 'off' ? { mode: data.assign.modes[key], isAdmin, me: user.id, people, onAssign: assign } : null);
+  const cardFor = (o, col) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={assignFor(col.key)} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />;
+  // Title, deadline rule and hint of one column; `children` sits under the hint (the shipping-check bar).
+  const colHead = (col, { count, overdue, hint, workItems, children }) => (
+    <div className="dq-colhead">
+      <div className="dq-title"><h2>{L(col.label)}</h2><span className={`sd-count ${overdue ? 'hot' : ''}`} title={overdue ? `${overdue} overdue` : ''}>{count}</span>
+        {isAdmin && <Link className="dq-gear" to="/orders/shopify-desk/settings#dispatch" title={`${L(col.label)} settings`} aria-label={`${L(col.label)} settings`}>⚙</Link>}</div>
+      <span className="dq-when">{whenLabel(conf.stages[col.key])}</span>
+      <small>{hint}</small>
+      {children}
+      {data.assign.modes[col.key] !== 'off' && <span className="dq-when asg">{data.assign.modes[col.key] === 'auto' ? 'Shared out automatically' : 'Assigned by an admin'}</span>}
+      {data.assign.modes[col.key] !== 'off' && isAdmin && <Workload items={workItems} />}
+    </div>
+  );
+  // One service, one board: its own Order packed column and its own Order handover column. Shipway and Shiprocket orders never share a column.
+  const renderBoard = (pv) => {
+    const pl = providerLabel(pv);
+    const packedAll = data.columns.packed.filter((o) => provOf(o) === pv);
+    const filt = shipFilters[pv] || '';
+    const packed = filt ? packedAll.filter((o) => shipKey(o) === filt) : packedAll;
+    const { side, loose } = sideOf(pv);
+    const groups = side ? side.manifests || [] : [];
+    const handItems = handoverAll.filter((o) => provOf(o) === pv);
+    const handCount = side ? side.count : handItems.length;
+    const mine = picked.filter((id) => loose.some((o) => o.orderId === id));
+    const allPicked = loose.length > 0 && mine.length === loose.length;
+    const PK = COLS[1]; const HO = COLS[2];
+    return (
+      <section key={pv} className={`dq-pboard ${pv}`} aria-label={`${pl} board`}>
+        <div className="dq-pboard-head">
+          <h2>{pl} board</h2>
+          <span className="muted">{packedAll.length} packed · {handCount} to hand over</span>
+          {side && !side.configured && <span className="dq-off" title={`${pl} login is not set on the server`}>not connected</span>}
+        </div>
+        <div className="dq-pcols">
+          <div className="dq-col packed">
+            {colHead(PK, { count: packed.length, overdue: lateN(packedAll), hint: PK.hint(L, pl), workItems: packed, children: <ShipCheckBar items={packedAll} filter={filt} setFilter={(v) => setShipFilters((f) => ({ ...f, [pv]: v }))} onCheck={() => runCheck(pv)} checking={checking === pv} canCheck={actor} /> })}
+            <div className="dq-cards">
+              {packed.length === 0
+                ? <Empty title={filt ? 'No orders with this status' : `No ${pl} orders`}>{filt ? 'Pick another status above, or press the highlighted one again to show all.' : q ? 'No orders match this search.' : `Orders whose slip was marked ${pl} appear here.`}</Empty>
+                : packed.map((o) => cardFor(o, PK))}
+            </div>
+          </div>
+          <div className="dq-col handover">
+            {colHead(HO, { count: handCount, overdue: lateN(handItems), hint: HO.hint(L, pl), workItems: handItems })}
+            <div className="dq-cards">
+              {actor && (loose.length > 0 || (side && (side.couriers || []).length > 0)) && (
+                <div className="dq-bulk"><button className="btn good" onClick={() => setMaking(pv)}>Create {pl} manifest</button></div>
+              )}
+              {actor && loose.length > 0 && (
+                <div className="dq-bulk">
+                  <button className="btn ghost" onClick={() => setPicked(allPicked ? picked.filter((id) => !loose.some((o) => o.orderId === id)) : [...new Set([...picked, ...loose.map((o) => o.orderId)])])}>{allPicked ? 'Clear' : 'Select all'}</button>
+                  <button className="btn good" disabled={!mine.length} onClick={() => setHanding(loose.filter((o) => mine.includes(o.orderId)))}>Hand over selected ({mine.length})</button>
+                </div>
+              )}
+              {groups.map((g) => <ManifestGroup key={g.manifestId} g={g} canAct={actor} onHand={(grp) => { setHandingManifest(grp.manifestId); setHanding(grp.orders); }} onOpen={setOpen} />)}
+              {groups.length > 0 && loose.length > 0 && <p className="sd-hint">Not on a manifest yet:</p>}
+              {loose.length === 0 && groups.length === 0
+                ? <Empty title={`No ${pl} orders`}>{q ? 'No orders match this search.' : `Packed ${pl} orders wait here for their manifest and hand over.`}</Empty>
+                : loose.map((o) => cardFor(o, HO))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   return (
     <section>
       <div className="dq-head">
-        <p className="sd-hint">Confirmed orders land in Packing slip. Press {L('btnDone')} on a card, choose Shipway or Shiprocket, and it moves to the next column with that choice shown on the card. Each column has its own deadline.</p>
+        <p className="sd-hint">Confirmed orders land in {L('stepSlip')}. Press {L('btnDone')} on a card and choose Shipway or Shiprocket: the order moves to that service's own board, where it goes through {L('stepPacked')} and {L('stepHandover')}. Each column has its own deadline.</p>
         {user.role === 'admin' && <Link className="btn ghost" to="/orders/shopify-desk/settings#dispatch">⚙ Dispatch settings</Link>}
       </div>
       <div className="filters"><input type="search" placeholder="Search order number, name or phone" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" /><span className="grow" />
         <WhoFilter value={who} onChange={setWho} people={isAdmin ? people : []} show={!!data && (Object.values(data.assign.modes).some((m) => m !== 'off') || !!who)} />
+        {data && <div className="prov-filter" role="group" aria-label="Show board">
+          {[['', 'Both boards', null], ...PROVIDERS.map((p) => [p, providerLabel(p), data.columns.packed.filter((o) => provOf(o) === p).length + handoverAll.filter((o) => provOf(o) === p).length])].map(([key, label, n]) => <button key={key || 'both'} className={view === key ? 'on' : ''} aria-pressed={view === key} onClick={() => setView(key)}>{label}{n != null && <b>{n}</b>}</button>)}
+        </div>}
         {data && <span className="muted">{data.shown} {data.shown === 1 ? 'order' : 'orders'}{c && c.overdue ? ` · ${c.overdue} overdue` : ''}{held.length ? ` · ${held.length} on hold` : ''}{data.collectTotal ? ` · ${inr(data.collectTotal)} to collect on delivery` : ''}</span>}</div>
       <Loading error={error} loading={loading && !data}>
         {data && (
-          <div className="dq-board">
-            {COLS.map((col) => {
-              const allItems = col.key === 'handover' ? [] : data.columns[col.key];
-              const items = col.key === 'packed' && shipFilter ? allItems.filter((o) => shipKey(o) === shipFilter) : allItems;
-              const st = conf.stages[col.key];
-              return (
-                <div key={col.key} className={`dq-col ${col.key}`}>
-                  <div className="dq-colhead">
-                    <div className="dq-title"><h2>{L(col.label)}</h2><span className={`sd-count ${c.overdueBy[col.key] ? 'hot' : ''}`} title={c.overdueBy[col.key] ? `${c.overdueBy[col.key]} overdue` : ''}>{col.key === 'handover' ? handoverAll.length : items.length}</span>
-                      {user.role === 'admin' && <Link className="dq-gear" to="/orders/shopify-desk/settings#dispatch" title={`${L(col.label)} settings`} aria-label={`${L(col.label)} settings`}>⚙</Link>}</div>
-                    <span className="dq-when">{whenLabel(st)}</span>
-                    <small>{col.hint(L)}</small>
-                    {col.key === 'packed' && <ShipCheckBar items={allItems} filter={shipFilter} setFilter={setShipFilter} onCheck={runCheck} checking={checking} canCheck={actor} />}
-                    {data.assign.modes[col.key] !== 'off' && <span className="dq-when asg">{data.assign.modes[col.key] === 'auto' ? 'Shared out automatically' : 'Assigned by an admin'}</span>}
-                    {data.assign.modes[col.key] !== 'off' && isAdmin && <Workload items={col.key === 'handover' ? handoverAll : items} />}
-                  </div>
-                  <div className="dq-cards">
-                    {col.key === 'handover'
-                      ? PROVIDERS.map((pv) => {
-                        const { side, loose } = sideOf(pv);
-                        if (!side) return null;
-                        const groups = side.manifests || [];
-                        const mine = picked.filter((id) => loose.some((o) => o.orderId === id));
-                        const allPicked = loose.length > 0 && mine.length === loose.length;
-                        return (
-                          <div key={pv} className={`dq-side ${pv}`} aria-label={`${providerLabel(pv)} orders`}>
-                            <div className="dq-sidehead">
-                              <h3>{providerLabel(pv)}</h3><span className="sd-count">{side.count}</span>
-                              {!side.configured && <span className="dq-off" title={`${providerLabel(pv)} login is not set on the server`}>not connected</span>}
-                            </div>
-                            {actor && (loose.length > 0 || (side.couriers || []).length > 0) && (
-                              <div className="dq-bulk"><button className="btn good" onClick={() => setMaking(pv)}>Create {providerLabel(pv)} manifest</button></div>
-                            )}
-                            {actor && loose.length > 0 && (
-                              <div className="dq-bulk">
-                                <button className="btn ghost" onClick={() => setPicked(allPicked ? picked.filter((id) => !loose.some((o) => o.orderId === id)) : [...new Set([...picked, ...loose.map((o) => o.orderId)])])}>{allPicked ? 'Clear' : 'Select all'}</button>
-                                <button className="btn good" disabled={!mine.length} onClick={() => setHanding(loose.filter((o) => mine.includes(o.orderId)))}>Hand over selected ({mine.length})</button>
-                              </div>
-                            )}
-                            <div className="dq-sidecards">
-                              {groups.map((g) => <ManifestGroup key={g.manifestId} g={g} canAct={actor} onHand={(grp) => { setHandingManifest(grp.manifestId); setHanding(grp.orders); }} onOpen={setOpen} />)}
-                              {groups.length > 0 && loose.length > 0 && <p className="sd-hint">Not on a manifest yet:</p>}
-                              {loose.length === 0 && groups.length === 0
-                                ? <Empty title={`No ${providerLabel(pv)} orders`}>{q ? 'No orders match this search.' : `Packed orders booked through ${providerLabel(pv)} appear here.`}</Empty>
-                                : loose.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />)}
-                            </div>
-                          </div>
-                        );
-                      })
-                      : items.length === 0
-                        ? <Empty title={col.key === 'packed' && shipFilter ? 'No orders with this status' : 'Nothing here'}>{col.key === 'packed' && shipFilter ? 'Pick another status above, or press the highlighted one again to show all.' : col.key === 'slip' ? (q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.') : 'Cards arrive here when DONE is pressed in the column before.'}</Empty>
-                        : items.map((o) => <Card key={o.orderId} o={o} col={col} title={L(col.label)} assign={data.assign.modes[col.key] !== 'off' ? { mode: data.assign.modes[col.key], isAdmin, me: user.id, people, onAssign: assign } : null} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} picked={picked.includes(o.orderId)} onPick={pick} onDone={done} onHold={setHolding} onCancel={setCancelling} onSwitch={switchService} onOpen={setOpen} />)}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="dq-layout">
+            <div className={`dq-col slip`}>
+              {colHead(COLS[0], { count: data.columns.slip.length, overdue: c.overdueBy.slip, hint: COLS[0].hint(L), workItems: data.columns.slip })}
+              <div className="dq-cards">
+                {data.columns.slip.length === 0
+                  ? <Empty title="Nothing here">{q ? 'No orders match this search.' : 'Confirmed orders appear here the moment someone taps Confirmed.'}</Empty>
+                  : data.columns.slip.map((o) => cardFor(o, COLS[0]))}
+              </div>
+            </div>
+            <div className="dq-boards">
+              {PROVIDERS.filter((pv) => !view || view === pv).map((pv) => renderBoard(pv))}
+            </div>
           </div>
         )}
         {data && held.length > 0 && (

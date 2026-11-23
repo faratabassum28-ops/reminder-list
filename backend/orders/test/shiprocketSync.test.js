@@ -180,3 +180,21 @@ test('diagnoseOrder explains where an order was or was not found', async () => {
   const noAwb = await rocket.diagnoseOrder('2509');
   assert.equal(noAwb.order.awb, ''); assert.match(noAwb.hint, /no AWB yet/);
 });
+
+// ---- in-transit orders keep updating even when the order search can no longer find them ----
+test('sync: a tracked Shiprocket order is followed by its AWB, keeping the shipment id, even if the order search finds nothing', async () => {
+  rocket._reset();
+  let track = TRACK;
+  fake((u) => (u.pathname.includes('/courier/track/awb/') ? json(track) : api(u)));
+  const { sync, store } = loadSync({ dq: { provider: { name: 'shiprocket' } } });
+  await sync.refreshOne(2919);
+  assert.equal(store.get(2919).shipmentId, '55');
+  track = { tracking_data: { shipment_status: 17, shipment_track: [{ current_status: 'Out For Delivery', courier_name: 'Delhivery', awb_code: 'SR123456' }], shipment_track_activities: [{ date: '2026-10-21 09:00:00', 'sr-status-label': 'OUT FOR DELIVERY' }] } };
+  rocket._reset();
+  fake((u) => (u.pathname.endsWith('/auth/login') ? json({ token: 'T' }) : u.pathname.includes('/courier/track/awb/') ? json(track) : json({ data: [] }))); // search and list are empty now
+  const r = await sync.refreshOne(2919);
+  assert.equal(r.found, true); assert.equal(r.changed, true);
+  assert.equal(store.get(2919).statusCode, 'OOD');
+  assert.equal(store.get(2919).shipmentId, '55', 'order details from the first lookup are kept');
+  assert.ok(!calls.some((c) => c.path === 'orders'), 'no order search was needed');
+});

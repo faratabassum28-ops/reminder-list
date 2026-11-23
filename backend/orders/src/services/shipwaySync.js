@@ -33,8 +33,15 @@ async function shiprocketIds(orderIds) {
 }
 
 // Ask the right provider about one order -> { found, id, doc } | { found: false, message }
-async function lookup(orderId, provider) {
+// hint.awb: the AWB we already follow for this order. For Shiprocket it is tracked directly (no order search), which keeps old in-transit orders moving.
+async function lookup(orderId, provider, hint = {}) {
   if (provider === 'shiprocket') {
+    if (hint.awb) {
+      let td = null;
+      try { td = await rocket.trackByAwb(hint.awb); } catch (e) { if (e.code === 'auth' || e.code === 'not_configured') throw e; }
+      const shaped = td && fromShiprocket({ channel_order_id: String(orderId), shipments: [{ awb: hint.awb, courier: hint.courier }] }, td);
+      if (shaped) return { found: true, id: String(orderId), viaAwb: true, doc: normalizeShiprocket(shaped, String(orderId)) };
+    }
     const r = await rocket.getOrderShipment(orderId);
     if (!r.found) return r;
     const shaped = fromShiprocket(r.response.order, r.response.track);
@@ -52,7 +59,8 @@ async function refreshOne(orderId, provider) {
   const prev = await ShipwayShipment.findOne({ orderId }).lean();
   const now = new Date();
   let r;
-  try { r = await lookup(orderId, provider); } catch (e) {
+  const follow = provider === 'shiprocket' && prev && prev.found && !prev.final && (prev.provider || 'shipway') === 'shiprocket' && prev.awb ? { awb: prev.awb, courier: prev.carrier } : {};
+  try { r = await lookup(orderId, provider, follow); } catch (e) {
     if (e.code === 'auth' || e.code === 'not_configured') { e.provider = provider; throw e; } // nothing else will work for this provider either
     await ShipwayShipment.updateOne({ orderId }, { $set: { checkedAt: now, error: e.message }, $setOnInsert: { orderId, found: false } }, { upsert: true });
     return { orderId, error: e.message };
@@ -65,6 +73,7 @@ async function refreshOne(orderId, provider) {
     return { orderId, found: false };
   }
   const d = r.doc;
+  if (r.viaAwb) { delete d.shipmentId; delete d.weightKeys; delete d.weightInfo; if (!d.carrier) delete d.carrier; if (!d.from) delete d.from; if (!d.to) delete d.to; } // the tracking call carries no order details: keep what the order lookup saved
   const changed = !prev || prev.statusCode !== d.statusCode || prev.status !== d.status || prev.provider !== d.provider;
   const history = changed ? [...((prev && prev.history) || []), { code: d.statusCode, status: d.status, at: d.statusAt || now }].slice(-30) : prev.history;
   await ShipwayShipment.updateOne({ orderId }, { $set: { ...d, history, checkedAt: now, error: '', ...(changed ? { changedAt: now } : {}) } , $setOnInsert: { orderId } }, { upsert: true });
@@ -156,12 +165,13 @@ async function shipState(orderId, provider) {
 
 // Ask the right service about every order at "Order packed" and save the answer on the order (dq.shipCheck), so the card shows it.
 // onlyStale: skip orders checked in the last 30 minutes (the background run). A login problem stops that service only; the other carries on.
-async function checkPacked({ onlyStale = false, limit = 300 } = {}) {
+async function checkPacked({ onlyStale = false, limit = 300, provider = null } = {}) {
   if (!anyConfigured()) throw Object.assign(new Error('Neither Shipway nor Shiprocket is set up yet. Add a login on the server.'), { status: 400 });
   if (checkRunning()) throw Object.assign(new Error('A shipping status check is already running. Try again in a moment.'), { status: 409 });
   checkState.runningSince = Date.now();
   try {
     let docs = await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'packed' }).select('orderId dq.provider dq.shipCheck').lean();
+    if (provider) docs = docs.filter((d) => P.providerOf(d) === provider);
     if (onlyStale) docs = docs.filter((d) => SS.isStale(d.dq && d.dq.shipCheck));
     const all = docs.map((d) => ({ orderId: d.orderId, provider: P.providerOf(d) }));
     const skipped = all.filter((w) => !configured(w.provider));

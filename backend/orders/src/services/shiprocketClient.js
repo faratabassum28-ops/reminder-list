@@ -106,6 +106,18 @@ async function getOrderShipment(orderId) {
 }
 
 
+// Track one AWB directly -> Shiprocket's "tracking_data", or null when it has no scans for that AWB. This does not depend on the order search, so an
+// order handed over weeks ago (outside the newest-orders window) can still be followed. Auth problems are thrown; anything else is null.
+async function trackByAwb(awb) {
+  const a = clean(awb);
+  if (!a) return null;
+  if (isMock()) return { track_status: 1, shipment_status: 18, shipment_track: [{ current_status: 'In Transit', courier_name: 'Delhivery Surface', awb_code: a }], shipment_track_activities: [{ date: new Date().toISOString().slice(0, 19).replace('T', ' '), 'sr-status-label': 'IN TRANSIT' }] };
+  const t = await call('GET', `courier/track/awb/${encodeURIComponent(a)}`);
+  if (t.status === 401) throw new ShiprocketError('Shiprocket rejected the login', { status: 401, code: 'auth' });
+  const td = t.status < 400 && t.data && t.data.tracking_data;
+  return td && Array.isArray(td.shipment_track) && td.shipment_track.length ? td : null;
+}
+
 // The newest orders Shiprocket holds, as a plain list. Used by the Settings test (to show what Shiprocket really has) and as a fallback when the
 // search call does not find an order: one list is fetched and kept for 2 minutes, so many "not found" lookups do not each cost a call.
 const mockRecent = () => [3001, 3000, 2999].map((n) => ({ id: 700000 + n, channel_order_id: String(n), status: 'PICKUP SCHEDULED', shipments: [{ id: 800000 + n, awb: `SRMOCK${n}`, courier: 'Delhivery Surface' }] }));
@@ -165,4 +177,4 @@ async function createManifest({ shipmentIds }) {
   return { status: r.status, data: r.data, raw: r.raw };
 }
 
-module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, createManifest, recentOrders, diagnoseOrder, simple, _reset: () => { forgetToken(); recentCache = { at: 0, pages: 0, list: [] }; } };
+module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, trackByAwb, createManifest, recentOrders, diagnoseOrder, simple, _reset: () => { forgetToken(); recentCache = { at: 0, pages: 0, list: [] }; } };
