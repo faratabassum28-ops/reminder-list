@@ -492,9 +492,9 @@ async function dispatchSlip(user, orderId, { provider } = {}) {
 }
 
 // Ask the services about every order at "Order packed" and save the answer on each card (lib/shipState.js says what the answers mean).
-async function dispatchCheck() {
+async function dispatchCheck({ provider } = {}) {
   const sync = require('./shipwaySync');
-  try { return await sync.checkPacked({}); }
+  try { return await sync.checkPacked({ provider: PR.norm(provider) || undefined }); } // one board's button checks only that service's orders
   catch (e) { if (!e.status) e.status = e.code === 'auth' || e.code === 'not_configured' ? 400 : 502; throw e; }
 }
 
@@ -694,7 +694,7 @@ async function transitList(opts = {}) {
   const sBy = new Map(shops.map((x) => [x.orderId, x])); const hBy = new Map(ships.map((x) => [x.orderId, x]));
   const now = Date.now();
   const rows = desks.map((d) => {
-    const h = hBy.get(d.orderId); const c = cardOf(d, sBy.get(d.orderId), conf, h);
+    const h0 = hBy.get(d.orderId); const h = h0 && (h0.provider || 'shipway') === PR.providerOf(d) ? h0 : undefined; // a status left by the other service must not stand in const c = cardOf(d, sBy.get(d.orderId), conf, h);
     const at = d.dispatch && d.dispatch.at;
     return {
       orderId: c.orderId, orderName: c.orderName, name: c.name, phone: c.phone, city: c.city, state: c.state, total: c.total, collect: c.collect, payment: c.payment, items: c.items,
@@ -731,9 +731,9 @@ async function refreshTransit({ ids = null, limit = 60, minAgeMin = 0 } = {}) {
     const rocketIds = new Set((await DeskOrder.find({ orderId: { $in: want }, 'dq.provider.name': 'shiprocket' }).select('orderId').lean()).map((d) => d.orderId));
     const usable = (id) => (rocketIds.has(id) ? rocket.isConfigured() : client.isConfigured()); // an order whose provider is not connected is skipped, not failed
     want = want.filter(usable);
-    const have = await ShipwayShipment.find({ orderId: { $in: want } }).select('orderId final checkedAt').lean();
+    const have = await ShipwayShipment.find({ orderId: { $in: want } }).select('orderId final checkedAt provider').lean();
     const hBy = new Map(have.map((h) => [h.orderId, h]));
-    want = want.filter((id) => { const h = hBy.get(id); return !h || (!h.final && Date.now() - new Date(h.checkedAt || 0).getTime() >= minAgeMin * 60000); });
+    want = want.filter((id) => { const h = hBy.get(id); if (h && (h.provider || 'shipway') !== (rocketIds.has(id) ? 'shiprocket' : 'shipway')) hBy.delete(id); const k = hBy.get(id); return !k || (!k.final && Date.now() - new Date(k.checkedAt || 0).getTime() >= minAgeMin * 60000); }); // a record from the other service counts as "never checked"
     want.sort((a, b) => new Date((hBy.get(a) || {}).checkedAt || 0) - new Date((hBy.get(b) || {}).checkedAt || 0)); // never-checked first, then the stalest
     const queue = want.slice(0, Math.min(limit, 200));
     let checked = 0; let changed = 0; let failed = 0; let authErr = null;
@@ -935,8 +935,9 @@ async function refresh() {
 function start() {
   setTimeout(() => ingestIfStale(0), 15000);
   setInterval(() => ingestIfStale(0), 60 * 1000);
-  const every = require('../config').shipway.syncIntervalMin; // the same rhythm as the Shipway sync (0 = only by button)
-  if (every > 0 && require('./shipwayClient').isConfigured()) {
+  const cfg = require('../config');
+  const every = Math.min(...[cfg.shipway.syncIntervalMin, cfg.shiprocket.syncIntervalMin].filter((n) => n > 0), Infinity); // Shipway and Shiprocket share one rhythm (0 = only by button)
+  if (Number.isFinite(every) && (require('./shipwayClient').isConfigured() || require('./shiprocketClient').isConfigured())) { // either service is enough: a Shiprocket-only setup must refresh too
     const tick = () => refreshTransit({ limit: 80, minAgeMin: Math.min(30, every) }).catch((e) => { if (e.status !== 409) console.warn('[desk] in-transit refresh failed:', e.message); });
     setTimeout(tick, 45000);
     setInterval(tick, every * 60 * 1000);
