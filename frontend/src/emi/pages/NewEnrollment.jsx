@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from '../router';
 import { api } from '../api';
-import { inr, fmtDate, todayIST, autoSplit, fixedEmis, useFetch } from '../util';
+import { inr, fmtDate, todayIST, autoSplit, fixedEmis, maxEmisFor, useFetch } from '../util';
 import { Field, FileInput, Loading, Modal } from '../components/ui';
 
 const STEPS = ['Student', 'Fee & adjustments', 'EMI plan', 'Review & save'];
@@ -76,7 +76,7 @@ export default function NewEnrollment() {
   const planSum = emis.reduce((a, e) => a + money(e.amount_due), 0);
   const diff = balance - planSum;
   const datesOk = emis.every((e, i) => e.due_date && (i === 0 || e.due_date >= emis[i - 1].due_date));
-  const maxEmis = program ? program.max_emis : 12;
+  const maxEmis = maxEmisFor(program); // SUPER: 10, whatever 'Max EMIs' was saved as
   const fixed = fixedEmis(program); // e.g. SUPER: every student has exactly 10 EMIs
   useEffect(() => { if (fixed) setCount(fixed); }, [fixed]);
   const whole = (v) => Number.isInteger(money(v)) && money(v) >= 0;

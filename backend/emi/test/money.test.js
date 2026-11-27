@@ -166,6 +166,15 @@ test('enrollment: duplicate student in the same batch is blocked; sums must matc
   await assert.rejects(() => money.createEnrollment(admin, { batch: enr.batch, student: { full_name: 'New', phone: '+919811112222', email: 'n@x.com' }, total_fee: 100000, fee_change_reason: 'x', emis: [{ amount_due: 5, due_date: addDays(today, 5) }] }), /add up/i);
 });
 
+test('SUPER saved with an old max_emis of 6 still accepts the 10-EMI plan', async () => {
+  const program = await models.Program.create({ code: 'SUPER', name: 'SUPER', max_emis: 6, default_fee: 100000 });
+  const batch = await models.Batch.create({ code: 'SUPER-B10', program, batch_name: 'B10', status: 'Running' });
+  models.Batch.findById = (id) => { const row = models.Batch.rows.find((b) => String(b._id) === String(id)); return { populate: async () => row }; };
+  const emis = Array.from({ length: 10 }, (_, i) => ({ amount_due: 10000, due_date: addDays(today, 30 * (i + 1)) }));
+  const enr = await money.createEnrollment(admin, { batch: batch._id, student: { full_name: 'Old Cap', phone: '+919833333333', email: 'o@example.com' }, total_fee: 100000, fee_change_reason: 'x', emis });
+  assert.equal(inst(enr).length, 10);
+});
+
 test('SUPER is a fixed 10-EMI plan: 3 EMIs are rejected, 10 are accepted, restructure must keep 10', async () => {
   const program = await models.Program.create({ code: 'SUPER', name: 'SUPER', max_emis: 10, default_fee: 100000 });
   const batch = await models.Batch.create({ code: 'SUPER-B09', program, batch_name: 'B9', status: 'Running' });

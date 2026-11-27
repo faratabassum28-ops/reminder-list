@@ -32,6 +32,7 @@ export function addMonths(s, n) {
 
 // Same rule as the server: a program can be a fixed N-EMI plan (SUPER = 10, as in the PMS)
 export const FIXED_EMIS_BY_PROGRAM = { SUPER: 10 };
+export const maxEmisFor = (p) => (p ? fixedEmis(p) || p.max_emis || 12 : 12); // a fixed-EMI program is capped at its fixed count
 export const fixedEmis = (p) => (p ? (Number.isInteger(p.fixed_emis) && p.fixed_emis > 0 ? p.fixed_emis : FIXED_EMIS_BY_PROGRAM[String(p.code || '').toUpperCase()] || null) : null);
 
 // Same rule as the server: equal split, rupee remainder on the last EMI

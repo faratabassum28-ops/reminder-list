@@ -2,7 +2,7 @@ import { Link as HubLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { inr, fmtDate, useFetch } from '../util';
+import { inr, fmtDate, maxEmisFor, useFetch } from '../util';
 import { Badge, ErrorBox, Field, Loading, Modal, Tabs } from '../components/ui';
 
 const TABS = [
@@ -42,7 +42,7 @@ function Programs() {
       <div className="emi-table-wrap"><table>
         <thead><tr><th>Name</th><th className="num">Default fee</th><th className="num">Application fee</th><th className="num">Commitment fee</th><th className="num">Max EMIs</th><th>Status</th><th /></tr></thead>
         <tbody>{(data || []).map((p) => (
-          <tr key={p._id}><td>{p.name}</td><td className="num">{inr(p.default_fee)}</td><td className="num">{inr(p.default_application_fee)}</td><td className="num">{inr(p.default_commitment_fee)}</td><td className="num">{p.max_emis}</td>
+          <tr key={p._id}><td>{p.name}</td><td className="num">{inr(p.default_fee)}</td><td className="num">{inr(p.default_application_fee)}</td><td className="num">{inr(p.default_commitment_fee)}</td><td className="num">{maxEmisFor(p)}</td>
             <td><Badge status={p.active ? 'Active' : 'Paused'}>{p.active ? 'Active' : 'Hidden'}</Badge></td><td><button className="small" onClick={() => setEdit(p)}>Edit</button></td></tr>))}</tbody>
       </table></div>
       {edit && <ProgramForm p={edit} onClose={() => setEdit(null)} onDone={() => { setEdit(null); reload(); refreshNav(); }} />}

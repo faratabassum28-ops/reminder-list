@@ -79,7 +79,7 @@ async function createEnrollment(user, p, { imported = false } = {}) {
   const emis = (p.emis || []).map((e) => ({ amount_due: Number(e.amount_due), due_date: e.due_date }));
   const planErrors = E.validatePlan(fees.balance_due, emis);
   if (planErrors.length) throw bad(planErrors.join('; '));
-  if (emis.length > program.max_emis) throw bad(`${program.name} allows at most ${program.max_emis} EMIs`);
+  if (emis.length > E.maxEmiCount(program)) throw bad(`${program.name} allows at most ${E.maxEmiCount(program)} EMIs`);
   const fixed = E.fixedEmiCount(program);
   if (fixed && fees.balance_due > 0 && emis.length !== fixed) throw bad(`${program.name} is a ${fixed}-EMI plan for every student (the plan has ${emis.length})`);
 
@@ -285,7 +285,7 @@ async function restructurePlan(user, enrollmentId, emis, reason) {
   const errs = E.validatePlan(pool, clean);
   if (errs.length) throw bad(errs.join('; '));
   const lockedCount = all.filter((i) => !editable.includes(i) && !i.waived).length;
-  if (lockedCount + clean.length > enr.batch.program.max_emis) throw bad(`${enr.batch.program.name} allows at most ${enr.batch.program.max_emis} EMIs`);
+  if (lockedCount + clean.length > E.maxEmiCount(enr.batch.program)) throw bad(`${enr.batch.program.name} allows at most ${E.maxEmiCount(enr.batch.program)} EMIs`);
   const fixed = E.fixedEmiCount(enr.batch.program);
   if (fixed && lockedCount + clean.length !== fixed) throw bad(`${enr.batch.program.name} is a ${fixed}-EMI plan: with ${lockedCount} EMI(s) already paid or part-paid, the new plan needs exactly ${fixed - lockedCount} EMIs (it has ${clean.length})`);
 
