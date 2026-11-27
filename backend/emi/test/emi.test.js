@@ -108,6 +108,13 @@ test('phone normalisation and templates', () => {
 });
 
 /* ---------- Fixed 10-EMI plan (PMS: every SUPER student has EMI 1..10) ---------- */
+test('maxEmiCount: a fixed-EMI program is capped at its fixed count, even if an old lower max_emis (6/7/8) is saved', () => {
+  assert.equal(E.maxEmiCount({ code: 'SUPER', max_emis: 6 }), 10);
+  assert.equal(E.maxEmiCount({ code: 'SUPER', max_emis: 8, fixed_emis: null }), 10);
+  assert.equal(E.maxEmiCount({ code: 'RGM', max_emis: 4 }), 4);
+  assert.equal(E.maxEmiCount({ code: 'RGM' }), 12);
+});
+
 test('fixedEmiCount: SUPER is 10 by code; a program can pin its own; others are free', () => {
   assert.equal(E.fixedEmiCount({ code: 'SUPER' }), 10);
   assert.equal(E.fixedEmiCount({ code: 'super', fixed_emis: null }), 10);

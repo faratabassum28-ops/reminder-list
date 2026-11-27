@@ -15,6 +15,14 @@ function fixedEmiCount(program) {
   return FIXED_EMIS_BY_PROGRAM[String(program.code || '').toUpperCase()] || null;
 }
 
+/* The most EMIs a program may have. A fixed-EMI program is capped at exactly its fixed count, so an old, lower `max_emis`
+   (e.g. SUPER saved with 6/7/8) can never block the 10-EMI plan. */
+function maxEmiCount(program) {
+  const fixed = fixedEmiCount(program);
+  if (fixed) return fixed;
+  return (program && program.max_emis) || 12;
+}
+
 const isInt = (n) => Number.isInteger(n);
 const sum = (arr, f = (x) => x) => arr.reduce((a, x) => a + (f(x) || 0), 0);
 
@@ -197,7 +205,7 @@ function normalizePhone(p) {
 const isValidPhone = (p) => /^\+\d{8,15}$/.test(p);
 
 module.exports = {
-  DEFAULT_RULES, MANUAL_STATUSES, FIXED_EMIS_BY_PROGRAM, fixedEmiCount, computeFees, autoSplit, planFixedEmis, validatePlan, instalmentState,
+  DEFAULT_RULES, MANUAL_STATUSES, FIXED_EMIS_BY_PROGRAM, fixedEmiCount, maxEmiCount, computeFees, autoSplit, planFixedEmis, validatePlan, instalmentState,
   enrollmentStatus, studentBucket, allocatePayment, recalcFromPayments, renderTemplate,
   pickTemplateKey, fmtINR, fmtDate, normalizePhone, isValidPhone, sum,
 };

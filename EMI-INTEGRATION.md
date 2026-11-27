@@ -50,3 +50,5 @@ The PMS gives every SUPER student the same plan: EMI 0 (upfront) then EMI 1–10
 * Students already saved with 6/7/8 EMIs are fixed once with: `cd backend && npm run fix:emi-count` (dry run, writes `emi-normalize-report.csv`),
   then `npm run fix:emi-count -- --apply`. Paid / part-paid EMIs are untouched; the unpaid EMIs keep their combined amount and are re-split equally
   over the remaining slots, monthly. Each change is logged (plan history + activity). Anything unsafe is listed as MANUAL and left alone.
+* A fixed-EMI program's limit is its fixed count: an old, lower **Max EMIs** saved on SUPER (6/7/8) no longer blocks the 10-EMI plan
+  (new enrolment, import, restructure and `fix:emi-count` all use `maxEmiCount`).
