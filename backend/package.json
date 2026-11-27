@@ -18,7 +18,14 @@
     "migrate:certificates": "node certificates/migrate-standalone.js",
     "test:emi": "node --test \"emi/test/*.test.js\"",
     "seed:emi": "node emi/src/seed.js",
-    "fix:emi-count": "node emi/src/scripts/normalize-emis.js"
+    "fix:emi-count": "node emi/src/scripts/normalize-emis.js",
+    "test:leadfms": "node leadfms/test/integrations.test.mjs",
+    "test:leadfms:flow": "node leadfms/test/flow.test.mjs",
+    "test:salesfms": "node salesfms/test/integrations.test.mjs && node --test salesfms/salesDashboard/test/analytics.test.js salesfms/salesDashboard/test/clean.test.js",
+    "test:salesfms:flow": "node salesfms/test/flow.test.mjs",
+    "close:leadfms": "node leadfms/close-connected.js",
+    "close:salesfms": "node salesfms/close-connected.js",
+    "migrate:fms-team": "node utils/migrate-fms-team.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

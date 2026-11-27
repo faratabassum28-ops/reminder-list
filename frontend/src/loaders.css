@@ -282,3 +282,5 @@ html[data-offline-screen] .net-banner { display: none; }
   .sk, .il-dots i, .off-dot, .off-led-bad { animation: none; }
   .pl-topbar::before { width: 100%; opacity: .5; }
 }
+.ls-leadfms { --ls-a: #8b7bf5; --ls-b: #2a5fd6; }
+.ls-salesfms { --ls-a: #2dd4bf; --ls-b: #0d9488; }

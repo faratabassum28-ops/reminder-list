@@ -2,9 +2,9 @@ import express from "express";
 import User from "../models/User.js";
 import { getSettings } from "../models/Settings.js";
 import { clearAuthCache } from "../middleware/auth.js";
-import { ALL_APPS, storedAppsOf, cleanOrdersRoles, cleanEmiRole, certRoleOf, setDisabledApps, getDisabledApps } from "../utils/access.js";
+import { ALL_APPS, storedAppsOf, cleanOrdersRoles, cleanEmiRole, certRoleOf, fmsRoleOf, setDisabledApps, getDisabledApps } from "../utils/access.js";
 
-// Overall (all six apps) admin settings. Mounted behind requireAuth + requireAdmin in server.js, so nothing here is reachable by a
+// Overall (all eight apps) admin settings. Mounted behind requireAuth + requireAdmin in server.js, so nothing here is reachable by a
 // non-admin, whatever the frontend shows.
 const router = express.Router();
 
@@ -32,6 +32,12 @@ router.get("/overview", async (req, res) => {
     const e = { Admin: apps.emi.admins, Manager: 0, CRM: 0, Viewer: 0 };
     for (const u of members("emi")) e[cleanEmiRole(u.emiRole) || "Viewer"] += 1;
     apps.emi.roles = e;
+    // Lead FMS / Sales FMS: Admin / Caller.
+    for (const [id, field] of [["leadfms", "leadFmsRole"], ["salesfms", "salesFmsRole"]]) {
+      const r = { Admin: apps[id].admins, Caller: 0 };
+      for (const u of members(id)) r[fmsRoleOf(u, field) === "admin" ? "Admin" : "Caller"] += 1;
+      apps[id].roles = r;
+    }
     apps.workshop.roles = { Approver: apps.workshop.admins, Coordinator: members("workshop").filter((u) => u.canRequestWorkshops).length };
     apps.workshop.roles["Task owner"] = members("workshop").length - apps.workshop.roles.Coordinator;
     apps.reminder.roles = { Admin: apps.reminder.admins, Member: members("reminder").length };

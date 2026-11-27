@@ -1,0 +1,154 @@
+/* Sales Dashboard — every selector lives under .sd and every class starts with sd-, so it cannot leak into (or be
+   changed by) the rest of Sales FMS. Colours come from the Sales FMS tokens, so light/dark mode just works. */
+.salesfms-scope .sd { --card: var(--panel); --bg: var(--panel-alt); --new: #0ea5e9; font-size: 14.5px; }
+.salesfms-scope .sd .sd-sync { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.salesfms-scope .sd .sd-muted { color: var(--muted); font-size: 13px; margin: 0; }
+.salesfms-scope .sd .sd-note { margin: 8px 2px 16px; }
+
+/* tabs: one compact segmented row */
+.salesfms-scope .sd .sd-tabs { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 4px; padding: 5px; margin: 0 0 16px; width: fit-content; max-width: 100%; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-panel); scrollbar-width: none; }
+.salesfms-scope .sd .sd-tabs::-webkit-scrollbar { display: none; }
+.salesfms-scope .sd .sd-tab { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 650; white-space: nowrap; color: var(--muted); text-decoration: none; background: transparent; border: 0; transition: background .14s ease, color .14s ease; }
+.salesfms-scope .sd .sd-tab:hover { background: var(--accent-light); color: var(--accent-dark); }
+.salesfms-scope .sd .sd-tab-on, .salesfms-scope .sd .sd-tab-on:hover { background: linear-gradient(135deg, #14b8a6, #0d9488); color: #fff; box-shadow: 0 6px 16px -6px rgba(13, 148, 136, .6); }
+:root[data-theme="dark"] .salesfms-scope .sd .sd-tab-on { color: #04201c; }
+.salesfms-scope .sd .sd-num { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; font-size: 11px; font-weight: 800; background: var(--accent-light); color: var(--accent-dark); }
+.salesfms-scope .sd .sd-tab-on .sd-num { background: rgba(255, 255, 255, .25); color: inherit; }
+
+/* filter bar */
+.salesfms-scope .sd .sd-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; position: relative; z-index: 5; box-shadow: var(--shadow-panel); }
+.salesfms-scope .sd .sd-field { position: relative; display: flex; flex-direction: column; gap: 5px; }
+.salesfms-scope .sd .sd-field > label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.salesfms-scope .sd .sd-range { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.salesfms-scope .sd input[type=date], .salesfms-scope .sd .sd-select-btn { font: inherit; color: var(--ink); background: var(--panel-alt); border: 1px solid var(--line); border-radius: 10px; padding: 6px 9px; min-height: 36px; }
+.salesfms-scope .sd input[type=date]:focus, .salesfms-scope .sd .sd-select-btn:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.salesfms-scope .sd .sd-select-btn { display: flex; justify-content: space-between; gap: 10px; min-width: 170px; cursor: pointer; }
+.salesfms-scope .sd .sd-popover { position: absolute; top: 100%; left: 0; margin-top: 4px; min-width: 100%; max-height: 300px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); }
+.salesfms-scope .sd .sd-check { display: flex; gap: 8px; align-items: center; padding: 7px 9px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-size: 13px; }
+.salesfms-scope .sd .sd-check:hover { background: var(--accent-light); }
+.salesfms-scope .sd .sd-link { background: none; border: 0; color: var(--accent-dark); cursor: pointer; padding: 6px 8px; font: inherit; font-weight: 600; }
+.salesfms-scope .sd .sd-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.salesfms-scope .sd .sd-presets button, .salesfms-scope .sd .sd-switch button { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--panel-alt); border: 1px solid var(--line); padding: 7px 12px; border-radius: 10px; cursor: pointer; transition: all .12s ease; }
+.salesfms-scope .sd .sd-presets button:hover, .salesfms-scope .sd .sd-switch button:hover { border-color: var(--accent); color: var(--accent-dark); }
+.salesfms-scope .sd .sd-presets button.sd-on, .salesfms-scope .sd .sd-switch button.sd-on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 12px -4px rgba(13, 148, 136, .55); }
+:root[data-theme="dark"] .salesfms-scope .sd .sd-presets button.sd-on, :root[data-theme="dark"] .salesfms-scope .sd .sd-switch button.sd-on { color: #04201c; }
+.salesfms-scope .sd .sd-switch { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.salesfms-scope .sd .sd-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+
+/* layout */
+.salesfms-scope .sd .sd-grid { display: grid; gap: 16px; margin-bottom: 16px; }
+.salesfms-scope .sd .sd-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.salesfms-scope .sd .sd-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.salesfms-scope .sd .sd-two-one { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .salesfms-scope .sd .sd-four { grid-template-columns: repeat(2, minmax(0, 1fr)); } .salesfms-scope .sd .sd-two-one { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .salesfms-scope .sd .sd-four, .salesfms-scope .sd .sd-two { grid-template-columns: 1fr; } }
+
+/* cards */
+.salesfms-scope .sd .sd-card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; min-width: 0; box-shadow: var(--shadow-panel); }
+.salesfms-scope .sd .sd-grid > .sd-card { margin-bottom: 0; }
+.salesfms-scope .sd .sd-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.salesfms-scope .sd .sd-card h3 { margin: 0; font-family: var(--display); font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+.salesfms-scope .sd .sd-kpi-card::before { content: ""; position: absolute; left: 20px; top: 0; width: 30px; height: 3px; border-radius: 0 0 4px 4px; background: var(--accent); }
+.salesfms-scope .sd .sd-kpis { margin: 0; display: grid; gap: 12px; }
+.salesfms-scope .sd .sd-kpi { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; }
+.salesfms-scope .sd .sd-kpi dt { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.salesfms-scope .sd .sd-kpi dd { margin: 0; font-family: var(--display); font-size: 21px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.salesfms-scope .sd .sd-growth { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 2px 8px; border-radius: 999px; }
+.salesfms-scope .sd .sd-growth.sd-good { color: var(--good); background: var(--good-bg); }
+.salesfms-scope .sd .sd-growth.sd-bad { color: var(--bad); background: var(--bad-bg); }
+.salesfms-scope .sd .sd-growth.sd-flat { color: var(--muted); }
+.salesfms-scope .sd .sd-new { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 800; letter-spacing: .05em; color: #fff; background: var(--new); border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+.salesfms-scope .sd .sd-chart { width: 100%; min-width: 0; }
+.salesfms-scope .sd .sd-chart .recharts-text { fill: var(--muted); font-size: 12px; }
+.salesfms-scope .sd .sd-chart .recharts-cartesian-grid line { stroke: var(--line); }
+.salesfms-scope .sd .sd-chart .recharts-tooltip-wrapper .recharts-default-tooltip { background: var(--panel) !important; border: 1px solid var(--line) !important; border-radius: 10px; }
+.salesfms-scope .sd .sd-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.salesfms-scope .sd .sd-chip { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; background: var(--panel-alt); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; }
+.salesfms-scope .sd .sd-chip span:not(.sd-new) { color: var(--muted); }
+
+/* tables */
+.salesfms-scope .sd .sd-table-wrap { overflow: auto; }
+.salesfms-scope .sd .sd-table-wrap.sd-tall { max-height: 420px; }
+.salesfms-scope .sd .sd-tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.salesfms-scope .sd .sd-tbl th, .salesfms-scope .sd .sd-tbl td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.salesfms-scope .sd .sd-tbl th { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; position: sticky; top: 0; background: var(--panel-alt); }
+.salesfms-scope .sd .sd-tbl tbody tr:hover { background: var(--accent-light); }
+.salesfms-scope .sd .sd-tbl .sd-r { text-align: right; } .salesfms-scope .sd .sd-tbl .sd-strong { font-weight: 700; }
+.salesfms-scope .sd .sd-tbl tfoot td { font-weight: 800; border-top: 2px solid var(--line-strong); border-bottom: 0; background: var(--panel-alt); }
+.salesfms-scope .sd .sd-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
+
+/* callouts + heatmap */
+.salesfms-scope .sd .sd-callout .sd-eyebrow { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.salesfms-scope .sd .sd-callout .sd-big { margin: 8px 0 2px; font-family: var(--display); font-size: 30px; font-weight: 800; letter-spacing: -.03em; }
+.salesfms-scope .sd .sd-callout .sd-what { margin: 0 0 6px; font-weight: 650; }
+.salesfms-scope .sd .sd-callout.sd-ok { border-color: var(--good); } .salesfms-scope .sd .sd-callout.sd-ok .sd-big { color: var(--good); }
+.salesfms-scope .sd .sd-callout.sd-warn { border-color: var(--bad); } .salesfms-scope .sd .sd-callout.sd-warn .sd-big { color: var(--bad); }
+.salesfms-scope .sd .sd-heat-wrap { overflow: auto; }
+.salesfms-scope .sd .sd-heat { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 640px; text-align: center; font-variant-numeric: tabular-nums; }
+.salesfms-scope .sd .sd-heat th { color: var(--muted); font-size: 12px; font-weight: 600; padding: 4px; }
+.salesfms-scope .sd .sd-heat td { padding: 11px 4px; border-radius: 8px; font-size: 12px; border: 1px solid var(--line); }
+
+.salesfms-scope .sd .sd-notice { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 11px 16px; margin-bottom: 14px; box-shadow: var(--shadow-panel); }
+.salesfms-scope .sd .sd-notice.sd-error { border-left-color: var(--bad); }
+.salesfms-scope .sd .sd-fading { opacity: .6; transition: opacity .15s; }
+.salesfms-scope .sd code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* ================= period cards (Overview) ================= */
+.salesfms-scope .sd .sd-period { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px 16px; }
+.salesfms-scope .sd .sd-period::before { content: ""; position: absolute; left: 20px; top: 0; width: 34px; height: 3px; border-radius: 0 0 4px 4px; background: var(--accent); }
+.salesfms-scope .sd .sd-period header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.salesfms-scope .sd .sd-period h3 { font-size: 13px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .sd .sd-period header .sd-muted { margin-top: 2px; font-size: 12px; }
+.salesfms-scope .sd .sd-period-big { margin-top: 10px; font-family: var(--display); font-size: 34px; font-weight: 800; letter-spacing: -.035em; line-height: 1.1; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; }
+.salesfms-scope .sd .sd-period-big small { margin-top: 2px; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+.salesfms-scope .sd .sd-meter { height: 8px; margin-top: 12px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.salesfms-scope .sd .sd-meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #10b981, #34d399); transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.salesfms-scope .sd .sd-meter-label { margin: 5px 0 0; font-size: 12px; font-weight: 650; color: var(--good); }
+.salesfms-scope .sd .sd-mini { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px 18px; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.salesfms-scope .sd .sd-mini > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; align-items: flex-start; }
+.salesfms-scope .sd .sd-mini dt { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .sd .sd-mini dd { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.salesfms-scope .sd .sd-mini .sd-growth { font-size: 11px; padding: 1px 6px; }
+
+/* payments at a glance */
+.salesfms-scope .sd .sd-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.salesfms-scope .sd .sd-status-item { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border-radius: 14px; background: var(--panel-alt); border: 1px solid var(--line); border-left: 4px solid var(--line-strong); }
+.salesfms-scope .sd .sd-status-item strong { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
+.salesfms-scope .sd .sd-status-name { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .sd .sd-s-good { border-left-color: var(--good); } .salesfms-scope .sd .sd-s-good strong { color: var(--good); }
+.salesfms-scope .sd .sd-s-warn { border-left-color: var(--gold); } .salesfms-scope .sd .sd-s-warn strong { color: var(--warn); }
+.salesfms-scope .sd .sd-s-accent { border-left-color: var(--accent); } .salesfms-scope .sd .sd-s-accent strong { color: var(--accent); }
+
+/* chart tooltip */
+.salesfms-scope .sd-tip { min-width: 170px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line-strong); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .45); font-size: 13px; color: var(--ink); }
+.salesfms-scope .sd-tip-head { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); font-weight: 750; }
+.salesfms-scope .sd-tip-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.salesfms-scope .sd-tip-row i { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.salesfms-scope .sd-tip-row span { flex: 1; color: var(--muted); }
+.salesfms-scope .sd-tip-row b { font-variant-numeric: tabular-nums; }
+
+/* tables: easier to scan */
+.salesfms-scope .sd .sd-tbl { font-size: 14px; }
+.salesfms-scope .sd .sd-tbl th:first-child, .salesfms-scope .sd .sd-tbl td:first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); }
+.salesfms-scope .sd .sd-tbl thead th:first-child { background: var(--panel-alt); z-index: 2; }
+.salesfms-scope .sd .sd-tbl tbody tr:hover td:first-child { background: var(--accent-light); }
+.salesfms-scope .sd .sd-tbl tfoot td:first-child { background: var(--panel-alt); }
+.salesfms-scope .sd .sd-bar-cell { background: linear-gradient(90deg, rgba(13, 148, 136, .20) var(--w, 0%), transparent var(--w, 0%)); }
+.salesfms-scope .sd .sd-bar-cell span { font-weight: 700; }
+.salesfms-scope .sd .sd-pill { display: inline-block; min-width: 54px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; text-align: center; }
+.salesfms-scope .sd .sd-pill.sd-good { color: var(--good); background: var(--good-bg); }
+.salesfms-scope .sd .sd-pill.sd-warn { color: var(--warn); background: var(--warn-bg); }
+.salesfms-scope .sd .sd-pill.sd-bad { color: var(--bad); background: var(--bad-bg); }
+.salesfms-scope .sd .sd-rank { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; font-weight: 800; background: var(--panel-alt); border: 1px solid var(--line); color: var(--muted); }
+.salesfms-scope .sd .sd-rank-1 { background: linear-gradient(135deg, #fde68a, #f59e0b); color: #5b3a00; border-color: transparent; }
+.salesfms-scope .sd .sd-rank-2 { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; border-color: transparent; }
+.salesfms-scope .sd .sd-rank-3 { background: linear-gradient(135deg, #fdba74, #c2410c); color: #fff; border-color: transparent; }
+
+/* filters: calmer, grouped */
+.salesfms-scope .sd .sd-filters { gap: 16px 22px; padding: 14px 18px; }
+.salesfms-scope .sd .sd-presets { align-self: flex-end; }
+.salesfms-scope .sd .sd-callout .sd-big { font-size: 32px; }
+.salesfms-scope .sd .sd-card h3 { font-size: 16px; }
+.salesfms-scope .sd .sd-card-head .sd-muted { margin-top: 2px; }
+.salesfms-scope .sd .recharts-legend-item-text { color: var(--ink) !important; font-size: 13px; }
+@media (max-width: 760px) { .salesfms-scope .sd .sd-period-big { font-size: 30px; } .salesfms-scope .sd .sd-mini dd { font-size: 14px; } .salesfms-scope .sd .sd-tab { padding: 9px 14px; font-size: 13px; } }

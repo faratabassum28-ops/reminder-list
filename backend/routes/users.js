@@ -2,7 +2,7 @@ import express from "express";
 import User from "../models/User.js";
 import { hashPassword } from "../utils/auth.js";
 import { clearAuthCache } from "../middleware/auth.js";
-import { storedAppsOf, cleanApps, cleanOrdersRoles, cleanEmiRole, cleanCertRole, certRoleOf } from "../utils/access.js";
+import { storedAppsOf, cleanApps, cleanOrdersRoles, cleanEmiRole, cleanCertRole, certRoleOf, cleanFmsRole, fmsRoleOf } from "../utils/access.js";
 import { syncOrdersTeam } from "../utils/ordersTeam.js";
 import { syncEmiTeam } from "../utils/emiTeam.js";
 
@@ -11,7 +11,8 @@ import { syncEmiTeam } from "../utils/emiTeam.js";
 const withApps = (u) => {
   const o = u.toObject ? u.toObject() : u;
   delete o.passwordHash;
-  return { ...o, apps: storedAppsOf(o), certRole: certRoleOf(o), theme: o.theme === "dark" || o.theme === "light" ? o.theme : null, ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [], emiRole: o.role === "admin" ? "Admin" : cleanEmiRole(o.emiRole) || null, emiCanVerify: !!o.emiCanVerify };
+  return { ...o, apps: storedAppsOf(o), certRole: certRoleOf(o), theme: o.theme === "dark" || o.theme === "light" ? o.theme : null, ordersRoles: o.role === "admin" ? [] : cleanOrdersRoles(o.ordersRoles) || [], emiRole: o.role === "admin" ? "Admin" : cleanEmiRole(o.emiRole) || null, emiCanVerify: !!o.emiCanVerify,
+    leadFmsRole: fmsRoleOf(o, "leadFmsRole"), leadFmsName: o.leadFmsName || "", salesFmsRole: fmsRoleOf(o, "salesFmsRole"), salesFmsName: o.salesFmsName || "" };
 };
 
 const router = express.Router();
@@ -25,7 +26,7 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole } = req.body;
+    const { name, email, password, role, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole, leadFmsRole, leadFmsName, salesFmsRole, salesFmsName } = req.body;
     const cleaned = cleanApps(apps);
     const teams = cleanOrdersRoles(ordersRoles) || [];
     if (cleaned && cleaned.length === 0 && role !== "admin") return res.status(400).json({ error: "Pick at least one app" });
@@ -47,6 +48,10 @@ router.post("/", async (req, res) => {
       ...(cleanEmiRole(emiRole) ? { emiRole: cleanEmiRole(emiRole) } : {}),
       emiCanVerify: !!emiCanVerify,
       ...(cleanCertRole(certRole) ? { certRole: cleanCertRole(certRole) } : {}),
+      ...(cleanFmsRole(leadFmsRole) ? { leadFmsRole: cleanFmsRole(leadFmsRole) } : {}),
+      ...(cleanFmsRole(salesFmsRole) ? { salesFmsRole: cleanFmsRole(salesFmsRole) } : {}),
+      leadFmsName: String(leadFmsName || "").trim().slice(0, 60),
+      salesFmsName: String(salesFmsName || "").trim().slice(0, 60),
     });
     clearAuthCache();
     syncOrdersTeam();
@@ -62,7 +67,7 @@ router.post("/", async (req, res) => {
 // field.
 router.put("/:id", async (req, res) => {
   try {
-    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole, theme } = req.body;
+    const { name, role, active, password, slackId, canRequestWorkshops, apps, ordersRoles, emiRole, emiCanVerify, certRole, theme, leadFmsRole, leadFmsName, salesFmsRole, salesFmsName } = req.body;
     const updates = {};
     const current = apps !== undefined || ordersRoles !== undefined || emiRole !== undefined || role !== undefined ? await User.findById(req.params.id).lean() : null;
     if (apps !== undefined) {
@@ -83,6 +88,11 @@ router.put("/:id", async (req, res) => {
     if (emiRole !== undefined) { const r = cleanEmiRole(emiRole); if (r) updates.emiRole = r; }
     if (emiCanVerify !== undefined) updates.emiCanVerify = !!emiCanVerify;
     if (certRole !== undefined) { const r = cleanCertRole(certRole); if (r) updates.certRole = r; }
+    // Lead FMS / Sales FMS: role inside the app + the caller name leads are assigned to.
+    if (leadFmsRole !== undefined) { const r = cleanFmsRole(leadFmsRole); if (r) updates.leadFmsRole = r; }
+    if (salesFmsRole !== undefined) { const r = cleanFmsRole(salesFmsRole); if (r) updates.salesFmsRole = r; }
+    if (leadFmsName !== undefined) updates.leadFmsName = String(leadFmsName || "").trim().slice(0, 60);
+    if (salesFmsName !== undefined) updates.salesFmsName = String(salesFmsName || "").trim().slice(0, 60);
     // An admin can send someone back to the "light or dark?" question (null), or set their mode for them.
     if (theme !== undefined) { if (theme === null || theme === "light" || theme === "dark") updates.theme = theme; }
     // Whatever the account will look like after this save: EMI Manager needs a role (admins are EMI admins and need none).

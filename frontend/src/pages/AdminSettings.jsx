@@ -11,6 +11,8 @@ import TicketsLogo from "../components/TicketsLogo.jsx";
 import OrdersLogo from "../components/OrdersLogo.jsx";
 import CertificatesLogo from "../components/CertificatesLogo.jsx";
 import EmiLogo from "../components/EmiLogo.jsx";
+import LeadFmsLogo from "../components/LeadFmsLogo.jsx";
+import SalesFmsLogo from "../components/SalesFmsLogo.jsx";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import PageLoader from "../components/PageLoader.jsx";
 import { lazyRetry } from "../utils/lazyRetry.js";
@@ -55,6 +57,16 @@ const APPS = [
     id: "emi", name: "EMI Manager", tone: "#4a6fd6", Logo: EmiLogo, home: "/emi", settings: "/emi/settings",
     blurb: "Fees, EMI schedules and payments by program and batch, with reminders and verification.",
     roles: [["Admin", "Everything, including batch access for users and backups"], ["Manager", "Settings, imports, discounts above the limit"], ["CRM", "Enrols students, records payments, logs calls"], ["Viewer", "Read-only (can be allowed to verify payments)"]],
+  },
+  {
+    id: "leadfms", name: "Lead FMS", tone: "#5b5fe0", Logo: LeadFmsLogo, home: "/lead-fms", settings: "/lead-fms/settings",
+    blurb: "Workshop leads, follow-ups, attendee calls, bookings and payments, worked by callers.",
+    roles: [["Admin", "Daily board, reports, team, settings, assigns leads (hub admins are always admins)"], ["Caller", "Works only the leads assigned to their caller name"]],
+  },
+  {
+    id: "salesfms", name: "Sales FMS", tone: "#0d9488", Logo: SalesFmsLogo, home: "/sales-fms", settings: "/sales-fms/settings",
+    blurb: "Sales leads and closers with follow-ups, plus the enrollments and revenue dashboard.",
+    roles: [["Admin", "Daily board, reports, revenue dashboard, team, settings (hub admins are always admins)"], ["Caller", "Works only the leads assigned to their caller name"]],
   },
 ];
 

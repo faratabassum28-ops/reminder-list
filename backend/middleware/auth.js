@@ -52,15 +52,15 @@ export function requireAdmin(req, res, next) {
 }
 
 // Stacks after requireAuth — blocks accounts that weren't given this app
-// ("reminder" = Reminder List, "workshop" = Workshop PMS, "tickets", "orders", "certificates", "emi"). Enforced on the
+// ("reminder" = Reminder List, "workshop" = Workshop PMS, "tickets", "orders", "certificates", "emi", "leadfms", "salesfms"). Enforced on the
 // server so a workshop-only user can't reach reminder data by calling the
 // API directly, and vice versa.
-const APP_NAMES = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" };
+const APP_NAMES = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager", leadfms: "Lead FMS", salesfms: "Sales FMS" };
 export function requireApp(app) {
   return (req, res, next) => {
     if (!hasApp(req.user, app)) {
       if (req.user?.role !== "admin" && getDisabledApps().includes(app)) return res.status(403).json({ error: `${APP_NAMES[app] || "This app"} is switched off by an admin right now` });
-      return res.status(403).json({ error: `Your account doesn't have access to ${{ workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" }[app] || "the Reminder List"}` });
+      return res.status(403).json({ error: `Your account doesn't have access to ${{ workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager", leadfms: "Lead FMS", salesfms: "Sales FMS" }[app] || "the Reminder List"}` });
     }
     next();
   };
