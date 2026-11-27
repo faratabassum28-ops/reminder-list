@@ -13,6 +13,8 @@ import { api as ordersApi } from "../orders/api.js";
 import { certApi } from "../certificates/api.js";
 import { api as emiApi } from "../emi/api.js";
 import EmiLogo from "../components/EmiLogo.jsx";
+import LeadFmsLogo from "../components/LeadFmsLogo.jsx";
+import SalesFmsLogo from "../components/SalesFmsLogo.jsx";
 import "./hub.css";
 
 const greeting = () => {
@@ -21,7 +23,7 @@ const greeting = () => {
 };
 
 export default function Hub() {
-  const { user, logout, isAdmin, isCertAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi } = useAuth();
+  const { user, logout, isAdmin, isCertAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi, hasLeadFms, hasSalesFms } = useAuth();
   const navigate = useNavigate();
   const [wsStats, setWsStats] = useState(null);
   const [remStats, setRemStats] = useState(null);
@@ -192,6 +194,34 @@ export default function Hub() {
               {emiPulse && !(emiPulse.overdue > 0) && !(emiPulse.due_today > 0) && !(emiPulse.unverified > 0) && <span className="hub-pill">All caught up</span>}
               {!emiPulse && <span className="hub-pill hub-pill-quiet">Open</span>}
             </div>
+          </button>}
+          {hasLeadFms && <button type="button" className="hub-card hub-card-leadfms" onClick={() => open("/lead-fms")}>
+            <div className="hub-card-head">
+              <LeadFmsLogo size={54} />
+              <span className="hub-card-arrow" aria-hidden="true">→</span>
+            </div>
+            <h2>Lead FMS</h2>
+            <p>Every workshop lead, assigned to a caller, with timed follow-ups, attendee calls, bookings and Razorpay payments.</p>
+            <ul className="hub-card-points">
+              <li>Today and delayed follow-ups per caller</li>
+              <li>Day 1 / Day 2 attendee calls and attendance</li>
+              <li>Daily board, team performance and reports</li>
+            </ul>
+            <div className="hub-card-foot"><span className="hub-pill hub-pill-quiet">Open</span></div>
+          </button>}
+          {hasSalesFms && <button type="button" className="hub-card hub-card-salesfms" onClick={() => open("/sales-fms")}>
+            <div className="hub-card-head">
+              <SalesFmsLogo size={54} />
+              <span className="hub-card-arrow" aria-hidden="true">→</span>
+            </div>
+            <h2>Sales FMS</h2>
+            <p>Sales leads and closers with follow-up tasks, bookings and an enrollments and revenue dashboard from the Students Records sheet.</p>
+            <ul className="hub-card-points">
+              <li>Follow-ups and callbacks per closer</li>
+              <li>Programs, best periods and closer performance</li>
+              <li>Revenue and collections, refreshed every morning</li>
+            </ul>
+            <div className="hub-card-foot"><span className="hub-pill hub-pill-quiet">Open</span></div>
           </button>}
         </div>
       </main>

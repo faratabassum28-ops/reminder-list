@@ -5,6 +5,8 @@ import TicketsLogo from "./TicketsLogo.jsx";
 import OrdersLogo from "./OrdersLogo.jsx";
 import CertificatesLogo from "./CertificatesLogo.jsx";
 import EmiLogo from "./EmiLogo.jsx";
+import LeadFmsLogo from "./LeadFmsLogo.jsx";
+import SalesFmsLogo from "./SalesFmsLogo.jsx";
 import OfflineScreen from "./OfflineScreen.jsx";
 import { useNetwork } from "../context/NetworkContext.jsx";
 
@@ -24,6 +26,8 @@ const APPS = {
   orders: { Mark: OrdersLogo, name: "Order Analytics", cls: "ls-orders" },
   certificates: { Mark: CertificatesLogo, name: "Certificate Studio", cls: "ls-certificates" },
   emi: { Mark: EmiLogo, name: "EMI Manager", cls: "ls-emi" },
+  leadfms: { Mark: LeadFmsLogo, name: "Lead FMS", cls: "ls-leadfms" },
+  salesfms: { Mark: SalesFmsLogo, name: "Sales FMS", cls: "ls-salesfms" },
 };
 
 const STEPS = ["Getting things ready", "Checking your session", "Loading your workspace", "Almost there"];

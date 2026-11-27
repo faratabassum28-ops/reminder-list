@@ -24,7 +24,7 @@ function readCachedUser() {
 // ("certificates") and EMI Manager ("emi"), which a non-admin only has when an admin switched them on.
 function userApps(user) {
   if (!user) return [];
-  if (user.role === "admin") return ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
+  if (user.role === "admin") return ["reminder", "workshop", "tickets", "orders", "certificates", "emi", "leadfms", "salesfms"];
   if (!Array.isArray(user.apps)) return ["reminder", "workshop", "tickets"];
   return user.apps;
 }
@@ -123,7 +123,7 @@ export function AuthProvider({ children }) {
     });
 
   return (
-    <AuthContext.Provider value={{ user, loading, slow, login, logout, updateProfile, isAdmin: user?.role === "admin", isCertAdmin: user?.role === "admin" || user?.certRole === "admin", hasReminder: userApps(user).includes("reminder"), hasWorkshop: userApps(user).includes("workshop"), hasTickets: userApps(user).includes("tickets"), hasOrders: userApps(user).includes("orders"), hasCertificates: userApps(user).includes("certificates"), hasEmi: userApps(user).includes("emi"), canRequestWorkshops: user?.role === "admin" || user?.canRequestWorkshops === true }}>
+    <AuthContext.Provider value={{ user, loading, slow, login, logout, updateProfile, isAdmin: user?.role === "admin", isCertAdmin: user?.role === "admin" || user?.certRole === "admin", hasReminder: userApps(user).includes("reminder"), hasWorkshop: userApps(user).includes("workshop"), hasTickets: userApps(user).includes("tickets"), hasOrders: userApps(user).includes("orders"), hasCertificates: userApps(user).includes("certificates"), hasEmi: userApps(user).includes("emi"), hasLeadFms: userApps(user).includes("leadfms"), hasSalesFms: userApps(user).includes("salesfms"), canRequestWorkshops: user?.role === "admin" || user?.canRequestWorkshops === true }}>
       {children}
     </AuthContext.Provider>
   );

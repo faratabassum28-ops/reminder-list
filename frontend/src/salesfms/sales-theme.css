@@ -1,0 +1,329 @@
+/* =====================================================================
+   Sales FMS — design layer
+   Loaded after index.css + leads.css, so it re-points the design tokens and
+   refines every component. Direction: deep ink-teal chrome, bright teal as the
+   single brand colour, amber/red/green reserved for status, generous radii,
+   soft depth, display numerals (Plus Jakarta Sans) over a calm Inter body.
+===================================================================== */
+.salesfms-scope {
+  --ink: #0f1c24;
+  --paper: #f2f6f8;
+  --panel: #ffffff;
+  --panel-alt: #f6f9fa;
+  --line: #e2e9ed;
+  --line-strong: #cbd6dc;
+  --muted: #5b6b76;
+  --faint: #93a2ac;
+
+  --accent: #0d9488;
+  --accent-dark: #0f766e;
+  --accent-light: #e0f5f2;
+  --accent-2: #6366f1;
+  --gold: #f59e0b;
+
+  --sidebar-bg-top: #0f2a36;
+  --sidebar-bg-bottom: #07131b;
+
+  --good: #059669;  --good-bg: #dcf7ea;
+  --bad: #dc2626;   --bad-bg: #fde8e8;
+  --warn: #b45309;  --warn-bg: #fef3d6;
+
+  --radius: 16px;
+  --radius-sm: 11px;
+  --shadow-panel: 0 1px 2px rgba(15, 28, 36, 0.04), 0 8px 24px -12px rgba(15, 28, 36, 0.10);
+  --shadow-lift: 0 2px 4px rgba(15, 28, 36, 0.05), 0 18px 34px -16px rgba(13, 148, 136, 0.35);
+  --display: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+:root[data-theme="dark"] .salesfms-scope {
+  --ink: #e5eef2;
+  --paper: #0a1116;
+  --panel: #111b22;
+  --panel-alt: #16232c;
+  --line: #213039;
+  --line-strong: #2d404b;
+  --muted: #94a8b4;
+  --faint: #62767f;
+
+  --accent: #2dd4bf;
+  --accent-dark: #5eead4;
+  --accent-light: rgba(45, 212, 191, 0.13);
+  --accent-2: #a5b4fc;
+  --gold: #fbbf24;
+
+  --sidebar-bg-top: #0c1f29;
+  --sidebar-bg-bottom: #060e14;
+
+  --good: #34d399;  --good-bg: rgba(52, 211, 153, 0.14);
+  --bad: #f87171;   --bad-bg: rgba(248, 113, 113, 0.15);
+  --warn: #fbbf24;  --warn-bg: rgba(251, 191, 36, 0.14);
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 18px 34px -16px rgba(45, 212, 191, 0.25);
+}
+
+.salesfms-scope {
+  background:
+    radial-gradient(900px 380px at 100% -80px, rgba(13, 148, 136, 0.09), transparent 70%),
+    radial-gradient(700px 320px at -10% 0, rgba(99, 102, 241, 0.05), transparent 70%),
+    var(--paper);
+  background-attachment: fixed;
+}
+.salesfms-scope ::selection { background: var(--accent); color: #fff; }
+
+/* ---------------------------------------------------------------- sidebar */
+.salesfms-scope .sidebar {
+  width: 248px; padding: 20px 14px 14px; gap: 18px; overflow: hidden;
+  background: linear-gradient(190deg, var(--sidebar-bg-top), var(--sidebar-bg-bottom));
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+.salesfms-scope .sidebar::before { content: ""; position: absolute; inset: -120px -80px auto auto; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(45, 212, 191, 0.20), transparent 65%); pointer-events: none; }
+.salesfms-scope .sidebar > * { position: relative; }
+.salesfms-scope .brand { display: flex; align-items: center; gap: 11px; padding: 0 4px; }
+.salesfms-scope .brand-title { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -0.02em; color: #fff; line-height: 1.1; }
+.salesfms-scope .brand-sub { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.42); margin-top: 3px; }
+.salesfms-scope .theme-toggle, .salesfms-scope .collapse-btn { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); color: #cfe3e8; border-radius: 9px; }
+.salesfms-scope .theme-toggle:hover, .salesfms-scope .collapse-btn:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }
+.salesfms-scope .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.salesfms-scope .nav-section { margin: 14px 12px 5px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.34); }
+.salesfms-scope .nav-section:first-child { margin-top: 2px; }
+.salesfms-scope .nav-sep { height: 1px; margin: 10px 8px; background: rgba(255, 255, 255, 0.09); }
+.salesfms-scope .nav-link { position: relative; border-left: 0; padding: 10px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 550; color: #a9bcc4; }
+.salesfms-scope .nav-link:hover { background: rgba(255, 255, 255, 0.07); color: #fff; transform: none; }
+.salesfms-scope .nav-link.active { background: linear-gradient(90deg, rgba(45, 212, 191, 0.20), rgba(45, 212, 191, 0.05)); color: #fff; font-weight: 650; }
+.salesfms-scope .nav-link.active::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 4px 4px 0; background: #2dd4bf; box-shadow: 0 0 12px #2dd4bf; }
+.salesfms-scope .nav-link.active .nav-icon { color: #5eead4; }
+.salesfms-scope .nav-badge { margin-left: auto; min-width: 22px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-align: center; background: rgba(45, 212, 191, 0.18); color: #7ff0df; }
+.salesfms-scope .nav-badge-bad { background: rgba(248, 113, 113, 0.20); color: #fecaca; }
+.salesfms-scope .nav-icon-dot { background: #2dd4bf; }
+.salesfms-scope .sidebar-user { border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 12px; }
+.salesfms-scope .sidebar-user-name { font-weight: 650; }
+.salesfms-scope .sidebar-user-role { font-size: 11.5px; color: rgba(255, 255, 255, 0.5); }
+.salesfms-scope .sidebar-collapsed .sidebar { width: 72px; }
+.salesfms-scope .sidebar-collapsed .sidebar::before { display: none; }
+
+/* ---------------------------------------------------------------- page chrome */
+.salesfms-scope .content { max-width: 1380px; padding: 26px 40px 64px; }
+.salesfms-scope .page-header { margin-bottom: 20px; }
+.salesfms-scope h1 { font-family: var(--display); font-size: 28px; font-weight: 800; letter-spacing: -0.03em; }
+.salesfms-scope h2 { font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.salesfms-scope .subtitle { font-size: 14px; max-width: 70ch; }
+
+.salesfms-scope .ld-topbar { margin: 0 0 14px; }
+.salesfms-scope .ld-overdue { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 650; box-shadow: var(--shadow-panel); }
+.salesfms-scope .ld-overdue .ld-dot { width: 8px; height: 8px; border-radius: 50%; margin: 0; background: var(--good); }
+.salesfms-scope .ld-overdue.has .ld-dot { background: var(--bad); animation: sf-pulse 1.6s ease-out infinite; }
+.salesfms-scope .ld-overdue.has { background: var(--bad-bg); color: var(--bad); }
+@keyframes sf-pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); } 100% { box-shadow: 0 0 0 9px rgba(220, 38, 38, 0); } }
+
+/* ---------------------------------------------------------------- buttons / chips */
+.salesfms-scope .ld-btn { border-radius: 11px; padding: 8px 15px; border: 1px solid var(--line-strong); background: var(--panel); font-weight: 600; box-shadow: 0 1px 1px rgba(15, 28, 36, 0.04); }
+.salesfms-scope .ld-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-light); color: var(--accent-dark); transform: translateY(-1px); }
+.salesfms-scope .ld-btn-solid, .salesfms-scope .ld-btn-solid:hover:not(:disabled) { background: linear-gradient(135deg, #14b8a6, #0d9488); border-color: transparent; color: #fff; box-shadow: 0 6px 16px -6px rgba(13, 148, 136, 0.6); }
+.salesfms-scope .ld-btn-solid:hover:not(:disabled) { background: linear-gradient(135deg, #0d9488, #0f766e); }
+:root[data-theme="dark"] .salesfms-scope .ld-btn-solid { color: #04201c; }
+.salesfms-scope .ld-btn-wa { color: #128c4a; border-color: rgba(18, 140, 74, 0.35); }
+.salesfms-scope .ld-btn-wa:hover:not(:disabled) { background: rgba(37, 211, 102, 0.14); border-color: #25d366; color: #0e7a40; }
+.salesfms-scope .ld-chip { padding: 6px 13px; background: var(--panel); border-color: var(--line); }
+.salesfms-scope .ld-chip:hover { border-color: var(--accent); color: var(--accent-dark); }
+.salesfms-scope .ld-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 12px -4px rgba(13, 148, 136, 0.55); }
+:root[data-theme="dark"] .salesfms-scope .ld-chip.on { color: #04201c; }
+.salesfms-scope .ld-chip-n { opacity: 0.7; font-weight: 700; margin-left: 3px; }
+.salesfms-scope .range-pill-active, .salesfms-scope .range-pill-active:hover { box-shadow: 0 4px 12px -4px rgba(13, 148, 136, 0.55); }
+.salesfms-scope .pf-pill.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .salesfms-scope .pf-pill.on { color: #04201c; }
+.salesfms-scope .ld-pill { padding: 3px 10px; font-weight: 700; letter-spacing: 0.01em; }
+
+/* ---------------------------------------------------------------- KPI tiles */
+.salesfms-scope .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 0 0 18px; }
+.salesfms-scope .kpi { position: relative; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 15px; box-shadow: var(--shadow-panel); transition: transform 0.16s ease, box-shadow 0.16s ease; }
+.salesfms-scope .kpi::before { content: ""; position: absolute; left: 18px; top: 0; width: 28px; height: 3px; border-radius: 0 0 4px 4px; background: var(--line-strong); }
+.salesfms-scope .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.salesfms-scope .kpi-label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .kpi-value { font-family: var(--display); font-size: 31px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.salesfms-scope .kpi-hint { margin-top: 3px; font-size: 12px; color: var(--muted); }
+.salesfms-scope .kpi-accent::before { background: var(--accent); } .salesfms-scope .kpi-accent .kpi-value { color: var(--accent); }
+.salesfms-scope .kpi-good::before { background: var(--good); }     .salesfms-scope .kpi-good .kpi-value { color: var(--good); }
+.salesfms-scope .kpi-bad::before { background: var(--bad); }       .salesfms-scope .kpi-bad .kpi-value { color: var(--bad); }
+.salesfms-scope .kpi-neutral::before { background: var(--gold); }  .salesfms-scope .kpi-neutral .kpi-value { color: var(--warn); }
+
+/* ---------------------------------------------------------------- panels / tables */
+.salesfms-scope .ld-panel { margin-top: 18px; padding: 20px 22px; border-radius: var(--radius); }
+.salesfms-scope .ld-panel h3 { font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.salesfms-scope .ld-panel-head { padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.salesfms-scope .table-wrap { border-radius: var(--radius); box-shadow: var(--shadow-panel); }
+.salesfms-scope .table th { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--panel-alt); border-bottom: 1px solid var(--line); }
+.salesfms-scope .table td { border-bottom: 1px solid var(--line); }
+.salesfms-scope .table tbody tr { transition: background 0.1s ease; }
+.salesfms-scope .table tbody tr:hover { background: var(--accent-light); }
+.salesfms-scope .ld-panel .table-wrap { box-shadow: none; margin-top: 0; }
+.salesfms-scope .ld-namebtn b { border-bottom: 1px dashed transparent; transition: border-color 0.12s, color 0.12s; }
+.salesfms-scope .ld-namebtn:hover b { color: var(--accent-dark); border-bottom-color: currentColor; }
+.salesfms-scope .ld-input, .salesfms-scope .page input[type="text"], .salesfms-scope .page input[type="date"], .salesfms-scope .page input[type="time"], .salesfms-scope .page input[type="number"], .salesfms-scope .page select, .salesfms-scope .toolbar input, .salesfms-scope .toolbar select, .salesfms-scope .filter-row select { border-radius: 10px; }
+.salesfms-scope .ld-input:focus, .salesfms-scope .toolbar input:focus, .salesfms-scope .filter-row select:focus, .salesfms-scope .modal input:focus, .salesfms-scope .modal textarea:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+
+/* ---------------------------------------------------------------- follow-up columns + task cards */
+.salesfms-scope .ld-cols { gap: 18px; }
+.salesfms-scope .ld-col { border-radius: 20px; padding: 12px; background: var(--panel-alt); border: 1px solid var(--line); }
+.salesfms-scope .ld-col-head { border-bottom: 0; padding: 8px 8px 12px; margin-bottom: 4px; align-items: center; }
+.salesfms-scope .ld-col-head b { font-family: var(--display); font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+.salesfms-scope .ld-col-sub { color: var(--muted); font-size: 12.5px; }
+.salesfms-scope .ld-col-count { margin-left: auto; min-width: 28px; text-align: center; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: var(--accent-light); color: var(--accent-dark); }
+.salesfms-scope .ld-col-fu1 { border-top: 3px solid var(--accent); }
+.salesfms-scope .ld-col-fu2 { border-top: 3px solid var(--accent-2); }
+.salesfms-scope .ld-col-fu3 { border-top: 3px solid var(--gold); }
+.salesfms-scope .ld-col-fu4 { border-top: 3px solid var(--good); }
+.salesfms-scope .ld-col-fu1 .ld-col-head, .salesfms-scope .ld-col-fu2 .ld-col-head, .salesfms-scope .ld-col-fu3 .ld-col-head, .salesfms-scope .ld-col-fu4 .ld-col-head { border-bottom: 0; }
+.salesfms-scope .ld-task { border-radius: 14px; border: 1px solid var(--line); border-left-width: 1px; padding: 14px 15px; box-shadow: var(--shadow-panel); position: relative; transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease; }
+.salesfms-scope .ld-task::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 4px 4px 0; background: var(--line-strong); }
+.salesfms-scope .ld-task-over::before { background: var(--bad); } .salesfms-scope .ld-task-wait::before { background: var(--gold); } .salesfms-scope .ld-task-done::before { background: var(--good); }
+.salesfms-scope .ld-task:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--accent); }
+.salesfms-scope .ld-task-over, .salesfms-scope .ld-task-wait, .salesfms-scope .ld-task-done { border-left-color: var(--line); }
+.salesfms-scope .ld-task-calm::before { background: var(--accent); }
+.salesfms-scope .ld-avatar { background: linear-gradient(135deg, #14b8a6, #6366f1); color: #fff; font-weight: 800; box-shadow: 0 4px 10px -3px rgba(99, 102, 241, 0.5); }
+.salesfms-scope .ld-ws { background: var(--accent-light); color: var(--accent-dark); border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 650; }
+.salesfms-scope .ld-who-tag { border-radius: 999px; }
+.salesfms-scope .ld-last { border-radius: 8px; background: var(--panel-alt); padding: 6px 9px; }
+.salesfms-scope .ld-actions-3 .ld-btn { justify-content: center; }
+.salesfms-scope .ld-empty { border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: transparent; color: var(--muted); }
+
+/* team race strip */
+.salesfms-scope .ld-race2 { border-radius: var(--radius); padding: 12px 14px; gap: 4px 24px; box-shadow: var(--shadow-panel); }
+.salesfms-scope .ld-r2 { padding: 5px 8px; border-radius: 10px; }
+.salesfms-scope .ld-r2.me { background: var(--accent-light); box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.28); }
+.salesfms-scope .ld-track { border-radius: 999px; background: var(--line); }
+.salesfms-scope .ld-track i { border-radius: 999px; }
+.salesfms-scope .ld-fill-good, .salesfms-scope .ld-race-full { background: linear-gradient(90deg, #10b981, #34d399); }
+.salesfms-scope .ld-fill-accent, .salesfms-scope .ld-race-high { background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+
+/* ---------------------------------------------------------------- performance */
+.salesfms-scope .pf-card { border-radius: var(--radius); box-shadow: var(--shadow-panel); border-top-width: 3px; }
+.salesfms-scope .pf-big { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; }
+
+/* delete selected leads */
+.salesfms-scope .ld-btn-danger, .salesfms-scope .ld-btn-danger:hover:not(:disabled) { color: #fff; border-color: transparent; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 6px 16px -6px rgba(220, 38, 38, 0.6); }
+.salesfms-scope .ld-btn-danger:hover:not(:disabled) { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+.salesfms-scope .ld-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; margin: 0 0 12px; border-radius: 14px; background: var(--accent-light); border: 1px solid rgba(13, 148, 136, 0.3); }
+.salesfms-scope .ld-del { max-width: 440px; }
+.salesfms-scope .ld-del h3 { margin: 0 0 6px; font-family: var(--display); }
+.salesfms-scope .ld-del-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--panel-alt); border: 1px solid var(--line); cursor: pointer; }
+.salesfms-scope .ld-del-check input { margin-top: 3px; }
+
+/* ---------------------------------------------------------------- Assignment tracker */
+.salesfms-scope .as-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin: 4px 0 6px; }
+.salesfms-scope .as-card { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 16px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-panel); transition: transform .15s ease, box-shadow .15s ease; }
+.salesfms-scope .as-card::before { content: ""; position: absolute; left: 18px; top: 0; width: 34px; height: 3px; border-radius: 0 0 4px 4px; background: var(--good); }
+.salesfms-scope .as-card.as-bad::before { background: var(--bad); } .salesfms-scope .as-card.as-idle::before { background: var(--line-strong); }
+.salesfms-scope .as-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.salesfms-scope .as-card header { display: flex; align-items: center; gap: 11px; }
+.salesfms-scope .as-card header > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.salesfms-scope .as-card header b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.salesfms-scope .as-card header small { font-size: 12px; color: var(--muted); }
+.salesfms-scope .as-pill { padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.salesfms-scope .as-pill-good { color: var(--good); background: var(--good-bg); } .salesfms-scope .as-pill-bad { color: var(--bad); background: var(--bad-bg); } .salesfms-scope .as-pill-idle { color: var(--muted); background: var(--panel-alt); }
+.salesfms-scope .as-nums { display: grid; grid-template-columns: 1fr 1fr 1.1fr; gap: 10px; align-items: end; }
+.salesfms-scope .as-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.salesfms-scope .as-nums strong { font-family: var(--display); font-size: 30px; font-weight: 800; letter-spacing: -.035em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.salesfms-scope .as-nums span { font-size: 11.5px; color: var(--muted); }
+.salesfms-scope .as-spark-wrap { align-items: flex-end; text-align: right; }
+.salesfms-scope .as-spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 26px; }
+.salesfms-scope .as-spark i { width: 4px; border-radius: 2px; background: var(--accent); }
+.salesfms-scope .as-funnel { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--line); gap: 2px; }
+.salesfms-scope .as-funnel i { display: block; min-width: 4px; }
+.salesfms-scope .as-funnel-empty { opacity: .6; }
+.salesfms-scope .as-legend { list-style: none; margin: -4px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; font-size: 12.5px; }
+.salesfms-scope .as-legend li { display: flex; align-items: center; gap: 7px; color: var(--ink); }
+.salesfms-scope .as-legend li.zero { color: var(--faint); }
+.salesfms-scope .as-legend li i { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.salesfms-scope .as-legend li b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.salesfms-scope .as-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.salesfms-scope .as-metrics dt { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .as-metrics dd { margin: 3px 0 0; font-family: var(--display); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.salesfms-scope .as-card footer { display: flex; flex-wrap: wrap; gap: 8px; }
+.salesfms-scope .as-alert { padding: 4px 10px; border-radius: 999px; background: var(--bad-bg); color: var(--bad); font-size: 12px; font-weight: 700; }
+.salesfms-scope .as-table th button { all: unset; cursor: pointer; font: inherit; text-transform: inherit; letter-spacing: inherit; }
+.salesfms-scope .as-table th button:hover { color: var(--accent-dark); }
+.salesfms-scope .as-table th.as-sorted { color: var(--accent-dark); }
+.salesfms-scope .as-days { display: flex; align-items: flex-end; gap: 8px; height: 170px; padding-top: 6px; }
+.salesfms-scope .as-day { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.salesfms-scope .as-day i { display: block; width: 100%; max-width: 38px; border-radius: 7px 7px 3px 3px; background: linear-gradient(180deg, #2dd4bf, #0d9488); }
+.salesfms-scope .as-day.today i { background: linear-gradient(180deg, #fbbf24, #f59e0b); }
+.salesfms-scope .as-day-n { font-size: 12px; font-weight: 800; min-height: 15px; font-variant-numeric: tabular-nums; }
+.salesfms-scope .as-day small { font-size: 11px; color: var(--muted); }
+@media (max-width: 860px) { .salesfms-scope .as-grid { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- Daily Board */
+.salesfms-scope .bd-hero { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 26px 30px; margin-bottom: 18px; border-radius: 22px; color: #eafffb;
+  background: radial-gradient(520px 260px at 90% 0, rgba(45, 212, 191, 0.38), transparent 70%), radial-gradient(420px 260px at 0 110%, rgba(99, 102, 241, 0.35), transparent 70%), linear-gradient(135deg, #0f2a36, #0a1b24);
+  box-shadow: 0 24px 50px -24px rgba(7, 19, 27, 0.7); }
+.salesfms-scope .bd-hero h1 { color: #fff; font-size: 34px; margin: 6px 0 6px; }
+.salesfms-scope .bd-hero p { margin: 0; color: rgba(234, 255, 251, 0.72); max-width: 56ch; font-size: 14px; }
+.salesfms-scope .bd-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #7ff0df; }
+.salesfms-scope .bd-eyebrow .ld-dot { width: 8px; height: 8px; border-radius: 50%; margin: 0; background: #34d399; animation: sf-live 1.8s ease-out infinite; }
+@keyframes sf-live { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); } 100% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); } }
+.salesfms-scope .bd-hero-stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 20px; }
+.salesfms-scope .bd-hero-stats div { display: flex; flex-direction: column; }
+.salesfms-scope .bd-hero-stats b { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.salesfms-scope .bd-hero-stats span { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: rgba(234, 255, 251, 0.6); }
+.salesfms-scope .bd-hero-stats .warn b { color: #fca5a5; }
+.salesfms-scope .bd-ring { flex-shrink: 0; }
+.salesfms-scope .bd-ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 10; }
+.salesfms-scope .bd-ring-fg { fill: none; stroke: #2dd4bf; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.8s cubic-bezier(.2, .8, .2, 1); filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.6)); }
+.salesfms-scope .bd-ring-num { fill: #fff; font-family: var(--display); font-size: 26px; font-weight: 800; }
+.salesfms-scope .bd-ring-sub { fill: rgba(234, 255, 251, 0.6); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+.salesfms-scope .bd-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+.salesfms-scope .bd-grid .ld-panel { margin-top: 0; }
+.salesfms-scope .bd-floor { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
+.salesfms-scope .bd-caller { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-alt); transition: transform 0.14s, box-shadow 0.14s, border-color 0.14s; }
+.salesfms-scope .bd-caller:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--accent); }
+.salesfms-scope .bd-caller.has-over { border-color: rgba(220, 38, 38, 0.35); }
+.salesfms-scope .bd-caller header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.salesfms-scope .bd-caller header div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.salesfms-scope .bd-caller header b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.salesfms-scope .bd-caller header span:not(.avatar) { font-size: 12px; color: var(--muted); }
+.salesfms-scope .bd-caller header em { font-style: normal; font-family: var(--display); font-weight: 800; font-size: 15px; }
+.salesfms-scope .bd-caller header em.full { color: var(--good); } .salesfms-scope .bd-caller header em.mid { color: var(--accent); } .salesfms-scope .bd-caller header em.low { color: var(--warn); }
+.salesfms-scope .bd-caller dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 12px 0 0; }
+.salesfms-scope .bd-caller dt { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.salesfms-scope .bd-caller dd { margin: 2px 0 0; font-family: var(--display); font-weight: 800; font-size: 17px; }
+.salesfms-scope .bd-caller .bad dd { color: var(--bad); }
+.salesfms-scope .bd-esc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.salesfms-scope .bd-esc li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--bad-bg); }
+.salesfms-scope .bd-esc li div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.salesfms-scope .bd-esc li div span { font-size: 12px; color: var(--muted); }
+.salesfms-scope .bd-spark { width: 28%; min-width: 90px; }
+.salesfms-scope .bd-spark i { display: block; height: 8px; border-radius: 999px; background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+
+/* ---------------------------------------------------------------- drawer / modal / settings */
+.salesfms-scope .ld-drawer { border-radius: 22px 0 0 22px; }
+.salesfms-scope .modal-scrim, .salesfms-scope .ld-scrim { backdrop-filter: blur(5px); }
+.salesfms-scope .modal { border-radius: 20px; box-shadow: 0 30px 70px -20px rgba(7, 19, 27, 0.6); }
+.salesfms-scope .ld-seg button.on { background: var(--accent); color: #fff; }
+:root[data-theme="dark"] .salesfms-scope .ld-seg button.on { color: #04201c; }
+.salesfms-scope .ld-callout.good { background: var(--good-bg); border-color: transparent; }
+.salesfms-scope .ld-callout.bad { background: var(--bad-bg); border-color: transparent; }
+.salesfms-scope .ld-aq { border-radius: 14px; background: var(--panel-alt); }
+.salesfms-scope .ld-steps > div { border-radius: 12px; }
+.salesfms-scope .avatar { box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.3); }
+
+/* ---------------------------------------------------------------- login */
+.salesfms-scope .login-page { background: radial-gradient(900px 520px at 12% 8%, rgba(13, 148, 136, 0.55), transparent 62%), radial-gradient(800px 520px at 92% 92%, rgba(99, 102, 241, 0.42), transparent 62%), #07131b; }
+.salesfms-scope .login-card { position: relative; overflow: hidden; border-radius: 26px; padding: 34px 32px 28px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.7); }
+:root[data-theme="dark"] .salesfms-scope .login-card { background: rgba(17, 27, 34, 0.92); }
+.salesfms-scope .login-glow { position: absolute; inset: -90px auto auto -60px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(45, 212, 191, 0.35), transparent 65%); pointer-events: none; }
+.salesfms-scope .login-brand { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.salesfms-scope .login-title { font-family: var(--display); font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.salesfms-scope .login-suite { color: var(--muted); font-size: 13.5px; }
+.salesfms-scope .login-form button[type="submit"] { background: linear-gradient(135deg, #14b8a6, #0d9488); border: 0; color: #fff; border-radius: 12px; font-weight: 700; box-shadow: 0 10px 22px -8px rgba(13, 148, 136, 0.7); }
+.salesfms-scope .login-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); outline: 0; }
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width: 1100px) { .salesfms-scope .bd-grid { grid-template-columns: 1fr; } }
+@media (max-width: 860px) {
+  .salesfms-scope .content { padding: 70px 16px 44px; }
+  .salesfms-scope h1 { font-size: 24px; }
+  .salesfms-scope .bd-hero { flex-direction: column; align-items: flex-start; padding: 22px; }
+  .salesfms-scope .bd-hero h1 { font-size: 28px; }
+  .salesfms-scope .kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .salesfms-scope .kpi-value { font-size: 26px; }
+  .salesfms-scope .sidebar { width: 264px; }
+}
+@media (prefers-reduced-motion: reduce) { .salesfms-scope * { animation: none !important; transition: none !important; } }

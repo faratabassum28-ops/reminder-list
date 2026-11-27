@@ -2,12 +2,13 @@ import express from "express";
 import User from "../models/User.js";
 import { hashPassword, comparePassword, signToken } from "../utils/auth.js";
 import { requireAuth, clearAuthCache } from "../middleware/auth.js";
-import { appsOf, certRoleOf } from "../utils/access.js";
+import { appsOf, certRoleOf, fmsRoleOf } from "../utils/access.js";
 
 // The profile the frontend keeps. `theme` is null until the person has picked light or dark (they are asked once, on first sign-in).
 const publicUser = (u) => ({
   id: u._id, name: u.name, email: u.email, role: u.role, slackId: u.slackId, createdAt: u.createdAt,
-  canRequestWorkshops: !!u.canRequestWorkshops, apps: appsOf(u), certRole: certRoleOf(u), theme: u.theme === "dark" || u.theme === "light" ? u.theme : null,
+  canRequestWorkshops: !!u.canRequestWorkshops, apps: appsOf(u), certRole: certRoleOf(u),
+  leadFmsRole: fmsRoleOf(u, "leadFmsRole"), leadFmsName: u.leadFmsName || "", salesFmsRole: fmsRoleOf(u, "salesFmsRole"), salesFmsName: u.salesFmsName || "", theme: u.theme === "dark" || u.theme === "light" ? u.theme : null,
 });
 
 const router = express.Router();

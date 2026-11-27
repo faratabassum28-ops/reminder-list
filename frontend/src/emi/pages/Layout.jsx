@@ -65,7 +65,7 @@ export default function Layout() {
   const { user, logout, can } = useAuth();
   const hub = useHubAuth();
   const navigate = useNavigate();
-  const otherApps = hub.hasReminder || hub.hasWorkshop || hub.hasTickets || hub.hasOrders || hub.hasCertificates;
+  const otherApps = hub.hasReminder || hub.hasWorkshop || hub.hasTickets || hub.hasOrders || hub.hasCertificates || hub.hasLeadFms || hub.hasSalesFms;
   const hubNavigate = useHubNavigate();
   const backToHub = () => { sessionStorage.removeItem('hubChosen'); hubNavigate('/hub'); };
   const nav = useFetch(() => api.get('/nav'));

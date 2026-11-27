@@ -29,10 +29,10 @@ const userSchema = new mongoose.Schema(
     canRequestWorkshops: { type: Boolean, default: false },
     // Which apps this account may open: "reminder" (Reminder List) and/or
     // "workshop" (Workshop PMS) and/or "tickets" (Help Tickets) and/or "orders" (Order Analytics)
-    // and/or "certificates" (Certificate Studio) and/or "emi" (EMI Manager). Accounts created before this field existed
+    // and/or "certificates" (Certificate Studio) and/or "emi" (EMI Manager) and/or "leadfms" (Lead FMS) and/or "salesfms" (Sales FMS). Accounts created before this field existed
     // have no value and are treated as having the first three (see utils/access.js), so
     // nothing changes for existing people. Admins always get both.
-    apps: { type: [String], enum: ["reminder", "workshop", "tickets", "orders", "certificates", "emi"], default: undefined },
+    apps: { type: [String], enum: ["reminder", "workshop", "tickets", "orders", "certificates", "emi", "leadfms", "salesfms"], default: undefined },
     // Order Analytics ("orders" app): which desk team(s) this person works in. Admins see the whole dashboard and
     // need none. Everyone else needs at least one: "confirmation" (calls and confirms new orders) and/or
     // "packing" (the dispatch desk: slips, packing, handover).
@@ -47,6 +47,12 @@ const userSchema = new mongoose.Schema(
     // "Viewer" = read-only (Accounts can additionally be allowed to verify payments with emiCanVerify).
     emiRole: { type: String, enum: ["Admin", "Manager", "CRM", "Viewer"], default: undefined },
     emiCanVerify: { type: Boolean, default: false },
+    // Lead FMS ("leadfms") and Sales FMS ("salesfms"): the role inside each app ("admin" or "caller"; hub admins are always admins there)
+    // and the CALLER NAME leads are assigned to ("Assigned To" in the Google Sheet). Blank caller name = this account's name.
+    leadFmsRole: { type: String, enum: ["admin", "caller"], default: undefined },
+    leadFmsName: { type: String, trim: true, default: "" },
+    salesFmsRole: { type: String, enum: ["admin", "caller"], default: undefined },
+    salesFmsName: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 );

@@ -10,10 +10,10 @@ import SearchInput from "../components/SearchInput.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { avatarStyleFromString, initials } from "../utils/colorFromString.js";
 
-const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [], emiRole: "CRM", emiCanVerify: false, certRole: "issuer" };
+const empty = { name: "", email: "", password: "", role: "member", slackId: "", canRequestWorkshops: false, apps: ["reminder", "workshop", "tickets"], ordersRoles: [], emiRole: "CRM", emiCanVerify: false, certRole: "issuer", leadFmsRole: "caller", leadFmsName: "", salesFmsRole: "caller", salesFmsName: "" };
 
-const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager" };
-const APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
+const APP_LABEL = { reminder: "Reminder List", workshop: "Workshop PMS", tickets: "Help Tickets", orders: "Order Analytics", certificates: "Certificate Studio", emi: "EMI Manager", leadfms: "Lead FMS", salesfms: "Sales FMS" };
+const APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi", "leadfms", "salesfms"];
 // EMI Manager roles. Admins are EMI admins automatically.
 const EMI_ROLES = ["Admin", "Manager", "CRM", "Viewer"];
 const EMI_ROLE_HINT = { Admin: "Everything in EMI Manager, including users' batch access and backups", Manager: "Settings, imports, discounts, collections team", CRM: "Enrols students, records payments, logs calls", Viewer: "Read-only (can be allowed to verify payments)" };
@@ -38,7 +38,7 @@ export default function Users({ embedded = false }) {
   const [slackEditValue, setSlackEditValue] = useState("");
   const [slackSaving, setSlackSaving] = useState(false);
   const [q, setQ] = useState("");
-  const [appTab, setAppTab] = useState(["reminder", "workshop", "tickets", "orders", "certificates", "emi"].includes(params.get("app")) ? params.get("app") : "all");
+  const [appTab, setAppTab] = useState(APPS.includes(params.get("app")) ? params.get("app") : "all");
   const toast = useToast();
 
   const load = () => api.getUsers().then(setUsers).catch((e) => setError(e.message));
@@ -285,12 +285,12 @@ export default function Users({ embedded = false }) {
         <strong>Admins</strong> can delete data, manage Settings, and manage other accounts. <strong>Members</strong> can
         do day-to-day work — add, edit, complete, export — but not delete anything or reach Settings/Users. Slack ID is
         optional; people can also set their own from the Account page. <strong>App access</strong> decides which app a
-        person can open — Reminder List, Workshop PMS, Help Tickets, Certificate Studio, or any mix (admins always get all). In Certificate Studio, a <strong>Certificate admin</strong> manages templates and approves change requests; a <strong>Certificate issuer / creator</strong> issues certificates and requests corrections. <strong>Order Analytics</strong> is switched on per person with a role — Confirmation team, Dispatch team and/or Admin — which decides what they see there. <strong>EMI Manager</strong> has Admin, Manager, CRM and Viewer roles. A person with only one app
+        person can open — Reminder List, Workshop PMS, Help Tickets, Certificate Studio, or any mix (admins always get all). In Certificate Studio, a <strong>Certificate admin</strong> manages templates and approves change requests; a <strong>Certificate issuer / creator</strong> issues certificates and requests corrections. <strong>Order Analytics</strong> is switched on per person with a role — Confirmation team, Dispatch team and/or Admin — which decides what they see there. <strong>EMI Manager</strong> has Admin, Manager, CRM and Viewer roles. In <strong>Lead FMS</strong> and <strong>Sales FMS</strong> a person is an Admin or a Caller, and the <strong>caller name</strong> is what leads are assigned to (blank = their account name). A person with only one app
         goes straight into it and never sees the others.
       </p>
 
       <div className="range-pills" role="tablist" aria-label="Filter users by app" style={{ marginBottom: 10 }}>
-        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"], ["certificates", "Certificate Studio users"], ["emi", "EMI Manager users"]].map(([id, label]) => (
+        {[["all", "All users"], ["reminder", "Reminder List users"], ["workshop", "Workshop PMS users"], ["tickets", "Help Tickets users"], ["orders", "Order Analytics users"], ["certificates", "Certificate Studio users"], ["emi", "EMI Manager users"], ["leadfms", "Lead FMS users"], ["salesfms", "Sales FMS users"]].map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={appTab === id}
             className={"range-pill" + (appTab === id ? " range-pill-active" : "")} onClick={() => setAppTab(id)}>
             {label}{users ? ` (${id === "all" ? users.length : users.filter((u) => u.apps.includes(id)).length})` : ""}
@@ -379,6 +379,16 @@ export default function Users({ embedded = false }) {
                       </label>
                     </div>
                   )}
+                  {u.role !== "admin" && [["leadfms", "leadFmsRole", "leadFmsName", "Lead FMS"], ["salesfms", "salesFmsRole", "salesFmsName", "Sales FMS"]].filter(([a]) => u.apps.includes(a)).map(([a, roleF, nameF, label]) => (
+                    <div key={a} style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span className="muted" style={{ fontSize: 12 }}>{label}:</span>
+                      <select value={u[roleF] || "caller"} disabled={busyId === u._id} onChange={(e) => setEmi(u, { [roleF]: e.target.value })}>
+                        <option value="caller">Caller</option><option value="admin">Admin</option>
+                      </select>
+                      <input defaultValue={u[nameF] || ""} placeholder="Caller name (blank = account name)" style={{ width: 210 }} disabled={busyId === u._id}
+                        onBlur={(e) => { const v = e.target.value.trim(); if (v !== (u[nameF] || "")) setEmi(u, { [nameF]: v }); }} />
+                    </div>
+                  ))}
                   {u.role !== "admin" && u.apps.includes("certificates") && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       <span className="muted" style={{ fontSize: 12 }}>Certificates:</span>

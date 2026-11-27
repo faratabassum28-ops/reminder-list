@@ -1,8 +1,8 @@
 // Which apps a user may open. Admins always get every app; legacy accounts with no `apps` value keep the
 // first three so nothing breaks for existing people. Order Analytics ("orders"), Certificate Studio
-// ("certificates") and EMI Manager ("emi") are NEVER implied: a non-admin only has them when an admin ticked them on the Users page
-// (Order Analytics also needs a desk team).
-export const ALL_APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi"];
+// ("certificates"), EMI Manager ("emi"), Lead FMS ("leadfms") and Sales FMS ("salesfms") are NEVER implied: a non-admin only has them
+// when an admin ticked them on the Users page (Order Analytics also needs a desk team).
+export const ALL_APPS = ["reminder", "workshop", "tickets", "orders", "certificates", "emi", "leadfms", "salesfms"];
 const LEGACY_APPS = ["reminder", "workshop", "tickets"];
 
 // The desk teams inside Order Analytics. Admins see everything there; everyone else needs one or both.
@@ -56,3 +56,10 @@ export const certRoleOf = (user) => (!user ? "issuer" : user.role === "admin" ||
 // EMI Manager roles (admins are always "Admin" inside it).
 export const EMI_ROLES = ["Admin", "Manager", "CRM", "Viewer"];
 export const cleanEmiRole = (input) => (EMI_ROLES.includes(input) ? input : undefined);
+
+// Lead FMS / Sales FMS roles. "admin" = Daily Board, Reports, Team, Settings, sheet import, assigning leads; "caller" works only the leads
+// whose "Assigned To" matches their caller name (the name typed in the Google Sheet; blank = the person's account name).
+// Hub admins are always admins inside both apps.
+export const FMS_ROLES = ["admin", "caller"];
+export const cleanFmsRole = (input) => (FMS_ROLES.includes(input) ? input : undefined);
+export const fmsRoleOf = (user, field) => (!user ? "caller" : user.role === "admin" || user[field] === "admin" ? "admin" : "caller");

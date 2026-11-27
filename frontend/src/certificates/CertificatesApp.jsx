@@ -43,7 +43,7 @@ export default function CertificatesApp() {
 }
 
 function Shell() {
-  const { user, logout, isCertAdmin: isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasEmi } = useAuth();
+  const { user, logout, isCertAdmin: isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasEmi, hasLeadFms, hasSalesFms } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { templates, error: tplError } = useTemplates();
   const navigate = useNavigate();
@@ -141,7 +141,7 @@ function Shell() {
 
         </nav>
 
-        {(hasReminder || hasWorkshop || hasTickets || hasOrders || hasEmi) && (
+        {(hasReminder || hasWorkshop || hasTickets || hasOrders || hasEmi || hasLeadFms || hasSalesFms) && (
           <button type="button" className="nav-link cs-switch" onClick={backToHub} title="Switch app">
             <span className="nav-icon-wrap">
               <svg className="nav-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>

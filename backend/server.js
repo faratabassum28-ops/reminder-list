@@ -25,6 +25,8 @@ import slackRoutes from "./routes/slack.js";
 import orders from "./orders/index.js";
 import certificates from "./certificates/index.js";
 import emi from "./emi/index.js";
+import leadfms from "./leadfms/index.js";
+import salesfms from "./salesfms/index.js";
 import { syncOrdersTeam } from "./utils/ordersTeam.js";
 import { syncEmiTeam } from "./utils/emiTeam.js";
 import { runTicketReminders, inReminderWindow } from "./utils/ticketReminders.js";
@@ -129,9 +131,18 @@ app.use(cors(corsOptions)); // also answers OPTIONS preflight
 app.use("/api/slack", slackRoutes);
 // Proof screenshots arrive as (client-resized) data URLs, so allow more than the 100kb default.
 // The raw body is kept for the Shopify webhook only: its signature is computed over the exact bytes.
-const jsonBody = express.json({ limit: "3mb", verify: (req, res, buf) => { if (req.originalUrl.startsWith("/api/orders/webhook/shopify")) req.rawBody = buf; } });
+// The same goes for the Razorpay payment webhooks of Lead FMS / Sales FMS (/api/lead-fms/intake, /api/sales-fms/intake).
+const RAW_BODY_PATHS = ["/api/orders/webhook/shopify", "/api/lead-fms/intake", "/api/sales-fms/intake"];
+const keepRaw = (req, res, buf) => { if (RAW_BODY_PATHS.some((p) => req.originalUrl.startsWith(p))) req.rawBody = buf; };
+const jsonBody = express.json({ limit: "3mb", verify: keepRaw });
+// Lead FMS / Sales FMS post big lists (bulk assign / delete, pasted attendance), so they get the roomier limit they always had.
+const fmsBody = express.json({ limit: "10mb", verify: keepRaw });
 // EMI Manager's bulk student import posts a big JSON body, so it gets a roomier limit (and only after sign-in, see its mount below).
-app.use((req, res, next) => (req.originalUrl.startsWith("/api/emi") ? next() : jsonBody(req, res, next)));
+app.use((req, res, next) => {
+  const u = req.originalUrl;
+  if (u.startsWith("/api/emi")) return next();
+  return (u.startsWith("/api/lead-fms") || u.startsWith("/api/sales-fms") ? fmsBody : jsonBody)(req, res, next);
+});
 // Gzip every response — the Master and Submission Log pages return
 // hundreds-to-thousands of JSON rows and the CSV exports are much larger
 // still; compressing those cuts transfer time noticeably, especially for
@@ -190,6 +201,14 @@ app.use("/api/certificates", requireAuth, requireApp("certificates"), certificat
 // connection (EMI_MONGO_URI, or the EMI_DB_NAME database on the hub's cluster) in the emi_* collections. Hub admins are EMI admins; everyone
 // else has the EMI role picked on the Users page (Manager / CRM / Viewer).
 app.use("/api/emi", requireAuth, requireApp("emi"), express.json({ limit: "10mb" }), emi.router);
+// Lead FMS and Sales FMS — the 7th and 8th apps, living in ./leadfms and ./salesfms. Each keeps its data on its OWN connection (LEADFMS_MONGO_URI /
+// SALESFMS_MONGO_URI, or the mysoul_leadfms / mysoul_salesfms database on the hub's cluster). People are the hub's accounts: a hub admin
+// (or anyone given the "admin" role of the app on the Users page) runs the app, everyone else is a caller who sees only their own leads.
+// The public entry points (Google Sheet ping, Razorpay webhook) carry their own secret and must stay above the login.
+app.use("/api/lead-fms/intake", leadfms.publicRouter);
+app.use("/api/sales-fms/intake", salesfms.publicRouter);
+app.use("/api/lead-fms", requireAuth, requireApp("leadfms"), leadfms.router);
+app.use("/api/sales-fms", requireAuth, requireApp("salesfms"), salesfms.router);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/reminder_list";
@@ -283,6 +302,10 @@ mongoose
     // EMI_SYNC=0 switches the scheduler off on a second instance.
     syncEmiTeam({ delayMs: 4_000 });
     if (process.env.EMI_SYNC !== "0") emi.start();
+    // Lead FMS / Sales FMS background jobs (sheet import + write-back every minute, daily share, WhatsApp retries, nightly snapshot,
+    // revenue dashboard refresh). LEADFMS_SYNC=0 / SALESFMS_SYNC=0 switch them off (e.g. on a second instance).
+    if (process.env.LEADFMS_SYNC !== "0") leadfms.start();
+    if (process.env.SALESFMS_SYNC !== "0") salesfms.start();
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err.message);

@@ -17,6 +17,8 @@ const WorkshopApp = lazyRetry(() => import("./workshops/WorkshopApp.jsx"));
 const OrdersApp = lazyRetry(() => import("./orders/OrdersApp.jsx"));
 const CertificatesApp = lazyRetry(() => import("./certificates/CertificatesApp.jsx"));
 const EmiApp = lazyRetry(() => import("./emi/EmiApp.jsx"));
+const LeadFmsApp = lazyRetry(() => import("./leadfms/LeadsApp.jsx"));
+const SalesFmsApp = lazyRetry(() => import("./salesfms/LeadsApp.jsx"));
 import Login from "./pages/Login.jsx";
 import ShortcutsHelp from "./components/ShortcutsHelp.jsx";
 import Logo from "./components/Logo.jsx";
@@ -79,7 +81,7 @@ const prefetchPages = () => {
 };
 
 export default function App() {
-  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi, canRequestWorkshops } = useAuth();
+  const { user, loading, slow, logout, isAdmin, hasReminder, hasWorkshop, hasTickets, hasOrders, hasCertificates, hasEmi, hasLeadFms, hasSalesFms, canRequestWorkshops } = useAuth();
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -123,22 +125,24 @@ export default function App() {
   if (!user) return <Login />;
 
   // Separate access per app: Reminder List, Workshop PMS, Help Tickets,
-  // Order Analytics, Certificate Studio and EMI Manager are six independent apps. A person only ever sees the ones their
+  // Order Analytics, Certificate Studio, EMI Manager, Lead FMS and Sales FMS are eight independent apps. A person only ever sees the ones their
   // account was given; someone with a single app goes straight into it and
   // never sees the chooser, everyone else picks from the chooser (/hub).
-  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets, orders: hasOrders, certificates: hasCertificates, emi: hasEmi };
+  const apps = { reminder: hasReminder, workshop: hasWorkshop, tickets: hasTickets, orders: hasOrders, certificates: hasCertificates, emi: hasEmi, leadfms: hasLeadFms, salesfms: hasSalesFms };
   const appCount = Object.values(apps).filter(Boolean).length;
   const onlyApp = appCount === 1 ? Object.keys(apps).find((k) => apps[k]) : null;
-  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets", orders: "/orders", certificates: "/certificates", emi: "/emi" };
+  const homeOf = { reminder: "/", workshop: canRequestWorkshops ? "/workshops/new" : "/workshops", tickets: "/tickets", orders: "/orders", certificates: "/certificates", emi: "/emi", leadfms: "/lead-fms", salesfms: "/sales-fms" };
   const inWorkshops = pathname === "/workshops" || pathname.startsWith("/workshops/");
   const inTickets = pathname === "/tickets" || pathname.startsWith("/tickets/");
   const inOrders = pathname === "/orders" || pathname.startsWith("/orders/");
   const inCertificates = pathname === "/certificates" || pathname.startsWith("/certificates/");
   const inEmi = pathname === "/emi" || pathname.startsWith("/emi/");
+  const inLeadFms = pathname === "/lead-fms" || pathname.startsWith("/lead-fms/");
+  const inSalesFms = pathname === "/sales-fms" || pathname.startsWith("/sales-fms/");
   const inAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
-  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : inCertificates ? "certificates" : inEmi ? "emi" : "reminder";
+  const currentApp = inWorkshops ? "workshop" : inTickets ? "tickets" : inOrders ? "orders" : inCertificates ? "certificates" : inEmi ? "emi" : inLeadFms ? "leadfms" : inSalesFms ? "salesfms" : "reminder";
 
-  // Admin Settings: overall settings for all six apps. Admins only; anyone else is sent back to their apps.
+  // Admin Settings: overall settings for all eight apps. Admins only; anyone else is sent back to their apps.
   if (inAdmin) {
     if (!isAdmin) return <Navigate to={onlyApp ? homeOf[onlyApp] : "/hub"} replace />;
     if (pathname === "/admin" || pathname === "/admin/") return <Navigate to="/admin/apps" replace />;
@@ -215,6 +219,27 @@ export default function App() {
       <Suspense fallback={<LoadingScreen app="emi" message="Opening EMI Manager" />}>
         <Routes>
           <Route path="/emi/*" element={<EmiApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+  // Lead FMS and Sales FMS (7th and 8th app). Their own screens live in ./leadfms and ./salesfms.
+  if (inLeadFms) {
+    if (!hasLeadFms) return <Navigate to={onlyApp ? homeOf[onlyApp] : "/hub"} replace />;
+    return (
+      <Suspense fallback={<LoadingScreen app="leadfms" message="Opening Lead FMS" />}>
+        <Routes>
+          <Route path="/lead-fms/*" element={<LeadFmsApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+  if (inSalesFms) {
+    if (!hasSalesFms) return <Navigate to={onlyApp ? homeOf[onlyApp] : "/hub"} replace />;
+    return (
+      <Suspense fallback={<LoadingScreen app="salesfms" message="Opening Sales FMS" />}>
+        <Routes>
+          <Route path="/sales-fms/*" element={<SalesFmsApp />} />
         </Routes>
       </Suspense>
     );
