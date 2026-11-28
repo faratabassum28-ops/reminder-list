@@ -155,9 +155,24 @@ async function latestOrder() {
   return data.orders.nodes[0] || null;
 }
 
+// Set the one team-status tag on an order: add `tag`, remove the other team tags so an order never carries two (e.g. confirmed AND cancelled).
+// gid = the order's Shopify id (gid://shopify/Order/...). Needs the write_orders scope. Throws ShopifyError (also for userErrors).
+const TAGS_ADD = `mutation($id: ID!, $tags: [String!]!) { tagsAdd(id: $id, tags: $tags) { userErrors { field message } } }`;
+const TAGS_REMOVE = `mutation($id: ID!, $tags: [String!]!) { tagsRemove(id: $id, tags: $tags) { userErrors { field message } } }`;
+async function setTeamTag(gid, tag, removeTags = []) {
+  const bad = (r, k) => (r && r[k] && r[k].userErrors && r[k].userErrors.length ? r[k].userErrors.map((e) => e.message).join('; ') : '');
+  const a = await graphql(TAGS_ADD, { id: gid, tags: [tag] });
+  const ea = bad(a, 'tagsAdd'); if (ea) throw new ShopifyError(`Shopify did not add the tag "${tag}": ${ea}`);
+  if (removeTags.length) {
+    const r = await graphql(TAGS_REMOVE, { id: gid, tags: removeTags });
+    const er = bad(r, 'tagsRemove'); if (er) throw new ShopifyError(`Shopify added "${tag}" but could not remove ${removeTags.join(', ')}: ${er}`);
+  }
+  return { ok: true };
+}
+
 async function ping() {
   const data = await graphql('{ shop { name myshopifyDomain currencyCode } }');
   return { shop: data.shop, scopes: scopes() };
 }
 
-module.exports = { ShopifyError, isConfigured, getToken, setTokenProvider, graphql, pullOrders, fetchByNumber, latestOrder, ping, scopes, _reset: () => { tok = { token: null, expiresAt: 0, scope: '' }; nextOkAt = 0; force401 = false; lastScope = ''; provider = null; } };
+module.exports = { ShopifyError, isConfigured, getToken, setTokenProvider, graphql, setTeamTag, pullOrders, fetchByNumber, latestOrder, ping, scopes, _reset: () => { tok = { token: null, expiresAt: 0, scope: '' }; nextOkAt = 0; force401 = false; lastScope = ''; provider = null; } };
