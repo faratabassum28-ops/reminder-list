@@ -604,9 +604,25 @@ async function createManifest(user, { courier, orderIds, provider }) {
       else {
         try { reply = await client.createManifest({ shipmentIds: sent.map((x) => x.shipmentId) }); }
         catch (e) { throw httpErr(502, e.message || 'Shiprocket could not be reached. Nothing was changed.'); }
-        const rawReply = (() => { try { return JSON.stringify(reply.data || reply.raw).slice(0, 1500); } catch { return String(reply.raw).slice(0, 1500); } })();
+        let rawReply = (() => { try { return JSON.stringify(reply.data || reply.raw).slice(0, 1500); } catch { return String(reply.raw).slice(0, 1500); } })();
         console.log('[manifest] Shiprocket reply for', want, ':', rawReply);
         out = require('../lib/shiprocketManifest').parseShiprocketManifest(reply, sent);
+        // Shiprocket refuses a manifest for a shipment whose pickup is not scheduled yet ("Manifest not generated"). When NOTHING was accepted,
+        // schedule the pickup for these shipments and ask once more. Switch off with SHIPROCKET_AUTO_PICKUP=0. If this does not help either,
+        // the original reason is kept and shown, together with what the pickup request answered.
+        if (!out.manifestId && process.env.SHIPROCKET_AUTO_PICKUP !== '0' && typeof client.generatePickup === 'function') {
+          try {
+            const pk = await client.generatePickup({ shipmentIds: sent.map((x) => x.shipmentId) });
+            const pkRaw = (() => { try { return JSON.stringify(pk.data || pk.raw).slice(0, 800); } catch { return ''; } })();
+            console.log('[manifest] Shiprocket pickup reply for', want, ':', pkRaw);
+            reply = await client.createManifest({ shipmentIds: sent.map((x) => x.shipmentId) });
+            rawReply = (() => { try { return JSON.stringify(reply.data || reply.raw).slice(0, 1500); } catch { return String(reply.raw).slice(0, 1500); } })();
+            console.log('[manifest] Shiprocket reply (after pickup) for', want, ':', rawReply);
+            const again = require('../lib/shiprocketManifest').parseShiprocketManifest(reply, sent);
+            if (again.manifestId) out = again;
+            else { const pkMsg = pk && pk.data && (pk.data.message || (pk.data.response && pk.data.response.data) || '') ; out = { ...again, rejected: again.rejected.map((r) => ({ ...r, reason: `${r.reason}${pkMsg ? ` (pickup request said: ${String(pkMsg).slice(0, 200)})` : ''}` })) }; }
+          } catch (e) { console.log('[manifest] Shiprocket pickup/retry failed:', e.message); }
+        }
         out.rejected = [...pre, ...out.rejected];
         out.rawReply = out.manifestId ? undefined : rawReply;
       }
