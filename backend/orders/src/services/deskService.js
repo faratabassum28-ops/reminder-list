@@ -103,7 +103,9 @@ async function act(user, orderId, action, input = {}) {
   if (action === 'partial_paid') throw httpErr(400, 'Use the partial payment form');
   const { doc, total } = await loadForAction(orderId, user);
   const t = D.transition(doc, action, input, await getConfig(), user, { total, orderId });
-  return brief(await applyTransition(doc, t));
+  const out = brief(await applyTransition(doc, t));
+  tagShopify(orderId, action); // not awaited: Shopify being slow must never slow the team down
+  return out;
 }
 
 async function savePartial(user, orderId, { amount, notes, file }) {
@@ -120,10 +122,34 @@ async function savePartial(user, orderId, { amount, notes, file }) {
   if (file) shot = await DeskShot.create({ orderId, mime: F.mimeOf(file.buffer), size: file.buffer.length, sha256: crypto.createHash('sha256').update(file.buffer).digest('hex'), data: file.buffer, byName: user.name });
   try {
     const t = D.transition(doc, 'partial_paid', { ...input, screenshotId: shot ? String(shot._id) : null }, conf, user, { total, orderId });
-    return brief(await applyTransition(doc, t));
+    const out = brief(await applyTransition(doc, t));
+    tagShopify(orderId, 'partial_paid');
+    return out;
   } catch (e) {
     if (shot) await DeskShot.deleteOne({ _id: shot._id }).catch(() => {});
     throw e;
+  }
+}
+// What the team did -> the tag the Shopify order gets (Shipway shows tags Shopify holds, if your Shipway setup syncs them).
+// Never blocks or fails the team's action: the result is written to the order's history instead.
+// Off until SHOPIFY_SCOPES includes write_orders (the app must be re-approved in Shopify for that scope).
+const TEAM_TAG = { confirm: 'team-confirmed', cancel: 'team-cancelled', partial_paid: 'team-partial-pay' };
+async function tagShopify(orderId, action) {
+  const tag = TEAM_TAG[action];
+  if (!tag) return;
+  const log = (action2, label) => DeskOrder.updateOne({ orderId }, { $push: { log: { at: new Date(), by: 'System', action: action2, stage: '', fu: '', label } } }).catch(() => {});
+  try {
+    const SC = require('./shopifyClient'); const cfg = require('../config');
+    if (!SC.isConfigured() || !/(^|,)write_orders(,|$)/.test(cfg.shopify.scopes)) return; // not switched on: do nothing, no noise
+    const so = await ShopifyOrder.findOne({ orderId }).select('shopifyId').lean();
+    if (!so || !so.shopifyId) throw new Error('the order has no Shopify id yet');
+    const others = Object.values(TEAM_TAG).filter((t) => t !== tag);
+    await SC.setTeamTag(so.shopifyId, tag, others);
+    await ShopifyOrder.updateOne({ orderId }, { $addToSet: { tags: tag } }).then(() => ShopifyOrder.updateOne({ orderId }, { $pull: { tags: { $in: others } } }));
+    await log('shopify_tag', `Tag “${tag}” added in Shopify`);
+  } catch (e) {
+    console.warn(`[desk] Shopify tag ${tag} for #${orderId} failed:`, e.message);
+    await log('shopify_tag_failed', `Tag “${tag}” NOT added in Shopify: ${e.message}`);
   }
 }
 const brief = (d) => ({ orderId: d.orderId, stage: d.stage, fuNo: d.fuNo, status: D.statusLabel(d), dueAt: d.dueAt || null });
@@ -592,7 +618,9 @@ async function dispatchCancel(user, orderId, { reason, note }) {
   const clean = DP.cleanNote(note, { label: 'note saying why the order is cancelled' });
   const t = D.transition(doc, 'cancel', { reason, note: clean }, await getConfig(), user, { total, orderId });
   t.set['dq.hold'] = null; // a cancelled order is not "on hold" any more
-  return brief(await applyTransition(doc, t, { assign: false }));
+  const out = brief(await applyTransition(doc, t, { assign: false }));
+  tagShopify(orderId, 'cancel');
+  return out;
 }
 
 const PHOTO_ERR = 'Every file must be a photo (JPG, PNG or WebP).';
