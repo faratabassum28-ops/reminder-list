@@ -12,7 +12,7 @@ const SUGGESTIONS = [
   "What are my next week tasks?",
   "What's due tomorrow?",
   "Any delayed tasks?",
-  "Open Dashboard",
+  "Open Team Performance",
 ];
 const ADMIN_SUGGESTIONS = [
   "What tasks did I complete?",
@@ -20,13 +20,13 @@ const ADMIN_SUGGESTIONS = [
   "Any new notifications?",
   "What's due today?",
   "What's due next week?",
-  "Open Dashboard",
+  "Open Team Performance",
 ];
 
 // Site knowledge — what each page/feature actually does. Lets the assistant answer
 // "what is X" / "how do I do Y" without hitting any API at all.
 const PAGE_INFO = {
-  dashboard: "The Dashboard shows the big picture: total tasks, On Time vs Delayed vs Pending, a leaderboard, and a date-range picker (Today, This Week, Last Month, etc). It's a live rollup, not a separate sheet.",
+  dashboard: "Team Performance shows the big picture: total tasks, On Time vs Delayed vs Pending, a leaderboard, and a date-range picker (Today, This Week, Last Month, etc). It's a live rollup, not a separate sheet.",
   master: "Master is the full reminder log — every task occurrence, Planned vs Actual, with live status. You can filter by status, Today / Tomorrow / Last Week / Next Week, or any From–To date range. Admins can add new recurring tasks here (task name, department, frequency, assignee, start date) and everyone can mark their own tasks done.",
   "task list": "Task List is the read-only catalog of recurring tasks — the \"what\" and \"how often\", not individual occurrences. To add a new task with its schedule, use Master instead.",
   "doer list": "Doer List is the roster of people tasks get assigned to — name, department, email. Doers are who tasks are for; Users are who can log in.",
@@ -62,7 +62,7 @@ function buildHelpMessage(isAdmin) {
   return (
     `I can look up almost anything about your account and this site. Try asking me:\n` +
     (isAdmin ? ADMIN_SUGGESTIONS : SUGGESTIONS).map((s) => `• ${s}`).join("\n") +
-    `\n\n🧭 I can also take you places — just say "open dashboard", "open master", "go to account", etc. and I'll jump you straight there. Or ask me "what is <page>?" to find out what any page does first.`
+    `\n\n🧭 I can also take you places — just say "open team performance", "open master", "go to account", etc. and I'll jump you straight there. Or ask me "what is <page>?" to find out what any page does first.`
   );
 }
 
@@ -76,7 +76,7 @@ function findPageInfo(q) {
 }
 
 const NAV_TARGETS = [
-  { re: /dashboard|home page/, path: "/", label: "Dashboard" },
+  { re: /team performance|dashboard|home page/, path: "/", label: "Team Performance" },
   { re: /\bmaster\b/, path: "/master", label: "Master" },
   { re: /task list|\btasks?\b/, path: "/tasks", label: "Task List" },
   { re: /doer/, path: "/doers", label: "Doer List" },
@@ -250,7 +250,7 @@ export default function Chatbot() {
         return {
           text:
             `Here's the rundown of what's here:\n` +
-            `• Dashboard — live totals & leaderboard\n` +
+            `• Team Performance — live totals & leaderboard\n` +
             `• Master — the full reminder log, mark tasks done here\n` +
             `• Task List — the catalog of recurring tasks\n` +
             `• Doer List — who tasks are assigned to\n` +

@@ -34,7 +34,7 @@ const NAV = [
   ["/ndr", "Non-Delivery Report (NDR)", "ndr", "sub"],
   ["/rto", "RTO & Returns", "rto", "sub"],
   ["/weight-discrepancy", "Weight Discrepancy", "weight", "sub"],
-  ["/team-performance", "Team performance", "team"],
+  ["/team-performance", "Team Performance", "team"],
   ["/trends", "Trends", "trends"],
   ["/payment-mode", "Payment mode", "payment"],
   ["/campaigns", "Campaigns", "campaigns"],

@@ -487,3 +487,14 @@
 /* sidebar: items keep their height (nav scrolls) and "All apps" stays pinned above the user card */
 .emi-scope .emi-sidebar nav > * { flex-shrink: 0; }
 .emi-scope .emi-switch { flex-shrink: 0; border-top: 1px solid rgba(255, 255, 255, .08); padding-top: 8px; }
+
+/* Team Performance: the calls-based score on top of the page */
+.emi-scope .emi-perf-hero { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.emi-scope .emi-perf-score { display: flex; align-items: baseline; gap: 2px; padding: 10px 22px; border-radius: 18px; background: var(--panel-alt); border: 1px solid var(--line); }
+.emi-scope .emi-perf-score b { font-size: 52px; line-height: 1; letter-spacing: -.03em; }
+.emi-scope .emi-perf-score span { font-size: 16px; color: var(--muted); }
+.emi-scope .emi-perf-score.good { background: var(--good-bg); } .emi-scope .emi-perf-score.good b { color: var(--good); }
+.emi-scope .emi-perf-score.warn { background: var(--warn-bg); } .emi-scope .emi-perf-score.warn b { color: var(--warn); }
+.emi-scope .emi-perf-score.bad { background: var(--bad-bg); } .emi-scope .emi-perf-score.bad b { color: var(--bad); }
+.emi-scope .emi-perf-grade { font-size: 20px; font-weight: 700; }
+.emi-scope .emi-perf-grade.good { color: var(--good); } .emi-scope .emi-perf-grade.warn { color: var(--warn); } .emi-scope .emi-perf-grade.bad { color: var(--bad); }

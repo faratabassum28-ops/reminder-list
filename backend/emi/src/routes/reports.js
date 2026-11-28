@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
-const { Batch, Payment, Enrollment, ReminderLog } = require('../models');
+const { Batch, Payment, Enrollment, ReminderLog, User } = require('../models');
 const { HttpError, h, auth, role, batchScope, assertBatchAccess, canVerify } = require('../middleware');
 const { getSettings } = require('../services/settings');
 const S = require('../services/snapshot');
@@ -9,6 +9,7 @@ const cache = require('../services/cache');
 const { todayIST } = require('../lib/dates');
 const E = require('../lib/emi');
 const { resolveWindow, previousWindow } = require('../lib/windows');
+const CS = require('../lib/callScore');
 const { addDays } = require('../lib/dates');
 
 const router = express.Router();
@@ -146,12 +147,11 @@ router.get('/pulse', auth, h(async (req, res) => {
   res.json({ today, overdue, due_today, broken, promised_today, unverified });
 }));
 
-/* ---------------- Team performance: who collected, who followed up, whose promises held ---------------- */
-router.get('/performance', auth, mgr, h(async (req, res) => {
+/* ---------------- Team Performance: scored on the CALLS the team made (plus who collected and whose promises held) ---------------- */
+// Shared by the page below and by the company-wide Team Performance on the hub (which passes an admin and a resolved window).
+async function performanceReport(user, w) {
   const today = todayIST();
-  const w = resolveWindow(String(req.query.window || 'this_month'), today, { from: req.query.from, to: req.query.to });
-  if (!w) throw new HttpError(400, 'Choose a valid time window');
-  const { rows, ids } = await snapshotFor(req.user);
+  const { rows, ids } = await snapshotFor(user);
   const inst = new Map();
   for (const r of rows) for (const i of r.instalments) inst.set(sid(i._id), i);
   const payQ = { batch: { $in: ids } };
@@ -159,21 +159,30 @@ router.get('/performance', auth, mgr, h(async (req, res) => {
   const enrIds = rows.map((r) => r.enrollment._id);
   const remQ = { enrollment: { $in: enrIds } };
   if (w.start) remQ.sent_at = { $gte: new Date(`${w.start}T00:00:00+05:30`), $lte: new Date(`${w.end}T23:59:59.999+05:30`) };
-  const [payments, reminders] = await Promise.all([
+  const [payments, reminders, staff] = await Promise.all([
     Payment.find(payQ, 'amount recorded_by_name reversal_of verified').lean(),
-    ReminderLog.find(remQ, 'sent_by_name channel outcome promised_date instalment').lean(),
+    ReminderLog.find(remQ, 'sent_by_name channel outcome promised_date instalment sent_at').lean(),
+    User.find({ active: { $ne: false }, role: { $in: ['CRM', 'Manager'] } }, 'name').lean(),
   ]);
   const people = new Map();
-  const who = (n) => { const k = n || '(unknown)'; if (!people.has(k)) people.set(k, { name: k, collected: 0, payments: 0, verified: 0, followups: 0, calls: 0, whatsapps: 0, promises: 0, kept: 0, broken: 0, pending: 0 }); return people.get(k); };
+  const who = (n) => { const k = n || '(unknown)'; if (!people.has(k)) people.set(k, { name: k, collected: 0, payments: 0, verified: 0, followups: 0, calls: 0, answered: 0, whatsapps: 0, promises: 0, kept: 0, broken: 0, pending: 0 }); return people.get(k); };
+  // everyone who is meant to be chasing instalments is on the board, even with zero calls (that is what a score is for)
+  for (const u of staff) who(u.name);
   for (const p of payments) {
     const x = who(p.recorded_by_name);
     x.collected += p.amount;
     if (p.amount > 0 && !p.reversal_of) { x.payments += 1; if (p.verified) x.verified += 1; }
   }
+  let firstCall = null;
   for (const r of reminders) {
     const x = who(r.sent_by_name);
     x.followups += 1;
-    if (r.channel === 'Call') x.calls += 1;
+    if (r.channel === 'Call') {
+      x.calls += 1;
+      if (r.outcome !== 'No answer') x.answered += 1;
+      const d = r.sent_at ? new Date(new Date(r.sent_at).getTime() + 330 * 60000).toISOString().slice(0, 10) : null;
+      if (d && (!firstCall || d < firstCall)) firstCall = d;
+    }
     if (r.channel === 'WhatsApp') x.whatsapps += 1;
     if (r.promised_date && ['Will pay on date', 'Asked for extension'].includes(r.outcome)) {
       x.promises += 1;
@@ -183,8 +192,32 @@ router.get('/performance', auth, mgr, h(async (req, res) => {
       else x.pending += 1;
     }
   }
-  const list = [...people.values()].map((x) => ({ ...x, kept_pct: x.kept + x.broken ? Math.round((x.kept / (x.kept + x.broken)) * 100) : null })).sort((a, b) => b.collected - a.collected || b.followups - a.followups);
-  res.json({ window: w, today, people: list, totals: { collected: E.sum(list, (p) => p.collected), followups: E.sum(list, (p) => p.followups), promises: E.sum(list, (p) => p.promises), kept: E.sum(list, (p) => p.kept), broken: E.sum(list, (p) => p.broken) } });
+  // working days the target is measured over: the window up to today ("all time" = since the first call)
+  const start = w.start || firstCall || today;
+  const end = w.end && w.end < today ? w.end : today;
+  const days = CS.workingDays(start, end), target = CS.targetPerDay(), perPerson = target * days;
+  const list = [...people.values()].map((x) => {
+    const score = CS.scoreOf(x, perPerson);
+    return { ...x, kept_pct: x.kept + x.broken ? Math.round((x.kept / (x.kept + x.broken)) * 100) : null, answer_pct: CS.pct(x.answered, x.calls), expected_calls: perPerson, score, grade: CS.gradeOf(score) };
+  }).filter((x) => x.name !== '(unknown)' || x.followups || x.collected)
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || b.calls - a.calls || b.collected - a.collected);
+  // only people who are on the calling team (or who actually called) are in the team score
+  const callers = list.filter((x) => x.calls > 0 || staff.some((u) => u.name === x.name));
+  const sumC = (k) => E.sum(callers, (p) => p[k]);
+  const tot = { calls: sumC('calls'), answered: sumC('answered'), kept: sumC('kept'), broken: sumC('broken') };
+  const expected = perPerson * callers.length;
+  const teamScore = CS.scoreOf(tot, expected);
+  return {
+    window: w, today, people: list,
+    team: { score: teamScore, grade: CS.gradeOf(teamScore), calls: tot.calls, expected_calls: expected, answered: tot.answered, answer_pct: CS.pct(tot.answered, tot.calls), members: callers.length, target_per_day: target, working_days: days },
+    totals: { collected: E.sum(list, (p) => p.collected), followups: E.sum(list, (p) => p.followups), calls: tot.calls, promises: E.sum(list, (p) => p.promises), kept: E.sum(list, (p) => p.kept), broken: E.sum(list, (p) => p.broken) },
+  };
+}
+router.get('/performance', auth, mgr, h(async (req, res) => {
+  const today = todayIST();
+  const w = resolveWindow(String(req.query.window || 'this_month'), today, { from: req.query.from, to: req.query.to });
+  if (!w) throw new HttpError(400, 'Choose a valid time window');
+  res.json(await performanceReport(req.user, w));
 }));
 
 /* ---------------- Insights: a time window against the equal-length window before it ---------------- */
@@ -298,3 +331,4 @@ router.get('/batches/:id/export', auth, role('Admin', 'Manager', 'Viewer'), h(as
 }));
 
 module.exports = router;
+module.exports.performanceReport = performanceReport;

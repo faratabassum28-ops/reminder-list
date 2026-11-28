@@ -46,7 +46,7 @@ const icons = {
 };
 
 const baseLinks = [
-  { to: "/", label: "Dashboard", end: true, icon: "dashboard" },
+  { to: "/", label: "Team Performance", end: true, icon: "dashboard" },
   { to: "/master", label: "Master", icon: "master" },
   { to: "/tasks", label: "Task List", icon: "tasks" },
   { to: "/submissions", label: "Submission Log", icon: "submissions" },

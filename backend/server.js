@@ -15,6 +15,7 @@ import reminderRoutes from "./routes/reminders.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import adminRoutes from "./routes/admin.js";
+import companyRoutes, { requireCompanyViewer } from "./routes/company.js";
 import { setDisabledApps } from "./utils/access.js";
 import notificationRoutes from "./routes/notifications.js";
 import chatbotRoutes from "./routes/chatbot.js";
@@ -167,6 +168,7 @@ app.use("/api/settings", requireAuth, requireAdmin, settingsRoutes);
 app.use("/api/reminders", requireAuth, requireAdmin, reminderRoutes);
 app.use("/api/users", requireAuth, requireAdmin, userRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, adminRoutes);
+app.use("/api/company", requireAuth, requireCompanyViewer, companyRoutes); // hub: company-wide Team Performance (managers only)
 app.use("/api/notifications", requireAuth, requireAdmin, notificationRoutes);
 // Member-level, like Doers/Tasks/Master — every signed-in person can ask
 // MySoul Assistant questions, the route itself scopes the data snapshot to their role.

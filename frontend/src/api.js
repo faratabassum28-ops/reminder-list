@@ -365,6 +365,9 @@ export const api = {
       `/consolidated/summary${range ? `?range=${range}` : ""}`
     ),
 
+  // Hub: company-wide Team Performance (only the company managers are allowed; the server checks)
+  getCompanyPerformance: (range) => request(`/company/team-performance?range=${range || "week"}`),
+
   getMyPerformance: (range) =>
     request(
       `/consolidated/me${range ? `?range=${range}` : ""}`

@@ -32,4 +32,14 @@ async function start() {
   backup.startScheduler();
 }
 
-module.exports = { router, start, syncTeam, clearIdentityCache: H.clearCache };
+// Company-wide Team Performance (the hub's overview for the managers): the same calls-based report as EMI Manager > Team Performance,
+// for every batch. key = today | this_week | last_week | this_month | last_month ...
+async function teamPerformance(key = 'this_month') {
+  const { todayIST } = require('./src/lib/dates');
+  const { resolveWindow } = require('./src/lib/windows');
+  const w = resolveWindow(key, todayIST());
+  if (!w) throw new Error('Unknown window');
+  return require('./src/routes/reports').performanceReport({ role: 'Admin', name: 'Team Performance' }, w);
+}
+
+module.exports = { router, start, syncTeam, teamPerformance, clearIdentityCache: H.clearCache };

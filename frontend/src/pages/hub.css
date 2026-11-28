@@ -65,3 +65,7 @@
 .hub-card-emi { --tone: #4a6fd6; animation-delay: 0.4s; }
 .hub-card-leadfms { --tone: #5b5fe0; animation-delay: 0.48s; }
 .hub-card-salesfms { --tone: #0d9488; animation-delay: 0.56s; }
+
+/* the managers also get the company Team Performance on top, which wants more room */
+.hub-main.hub-main-wide { width: min(1180px, 100%); }
+.hub-main.hub-main-wide .hub-grid { margin-top: 8px; }

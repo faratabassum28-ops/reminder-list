@@ -70,7 +70,7 @@ export default function Performance() {
           <h2 className="pf-h">Task scorecard: are they doing their work on time?</h2>
           <p className="pf-sub">Every follow-up call (FU1, FU2, FU3 …) has a deadline. A task counts here when its deadline falls in the period you picked.</p>
           <div className="pf-cards">
-            <Card cls={"c-" + t.rating} label="Team score" delta={<Delta now={t.score} before={p.score} />} value={t.score ?? "—"} big={t.score != null ? "/100" : ""}
+            <Card cls={"c-" + t.rating} label="Score" delta={<Delta now={t.score} before={p.score} />} value={t.score ?? "—"} big={t.score != null ? "/100" : ""}
               note={<span className={"pf-tag " + t.rating}>{LABEL[t.rating]}</span>} />
             <Card cls="c-due" label="Tasks due" delta={<Delta now={t.due} before={p.due} />} value={t.due} note={<span className="pf-note">{t.assigned} assigned in this period</span>} />
             <Card cls="c-good" label="Done on time" delta={<Delta pp now={rate(t)} before={rate(p)} />} value={t.onTime} note={<span className="pf-note">{t.due ? Math.round((t.onTime / t.due) * 100) : 0}% of tasks due</span>} />

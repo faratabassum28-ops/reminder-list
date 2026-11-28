@@ -15,6 +15,8 @@ import { api as emiApi } from "../emi/api.js";
 import EmiLogo from "../components/EmiLogo.jsx";
 import LeadFmsLogo from "../components/LeadFmsLogo.jsx";
 import SalesFmsLogo from "../components/SalesFmsLogo.jsx";
+import CompanyPulse from "./CompanyPulse.jsx";
+import { canViewCompany } from "../utils/companyView.js";
 import "./hub.css";
 
 const greeting = () => {
@@ -67,9 +69,12 @@ export default function Hub() {
         <button type="button" className="hub-ghost" onClick={logout}>Sign out</button>
       </header>
 
-      <main className="hub-main">
+      <main className={"hub-main" + (canViewCompany(user) ? " hub-main-wide" : "")}>
         <h1 className="hub-title">{greeting()}{first ? `, ${first}` : ""}.</h1>
         <p className="hub-sub">Where would you like to work today?</p>
+
+        {/* Company-wide Team Performance: only Nitin (company manager) and Fara see this; the server checks as well. */}
+        {canViewCompany(user) && <CompanyPulse onOpen={open} />}
 
         <div className="hub-grid">
           {hasReminder && <button type="button" className="hub-card hub-card-reminder" onClick={() => open("/")}>
@@ -78,10 +83,10 @@ export default function Hub() {
               <span className="hub-card-arrow" aria-hidden="true">→</span>
             </div>
             <h2>Reminder List</h2>
-            <p>Recurring tasks, doers, the Master log and the performance dashboard.</p>
+            <p>Recurring tasks, doers, the Master log and Team Performance.</p>
             <ul className="hub-card-points">
               <li>Master &amp; Task List</li>
-              <li>Dashboard &amp; Submission Log</li>
+              <li>Team Performance &amp; Submission Log</li>
               <li>Messages &amp; MySoul Assistant</li>
             </ul>
             <div className="hub-card-foot">
@@ -142,7 +147,7 @@ export default function Hub() {
             <ul className="hub-card-points">
               <li>Shopify desk · confirm &amp; dispatch queues</li>
               <li>NDR · RTO · Weight discrepancy</li>
-              <li>Overview, Trends &amp; Team performance</li>
+              <li>Overview, Trends &amp; Team Performance</li>
             </ul>
             <div className="hub-card-foot">
               {orderCount?.confirm?.due + orderCount?.pending?.due > 0 && (
@@ -185,7 +190,7 @@ export default function Hub() {
             <ul className="hub-card-points">
               <li>EMI tracker · overdue and due today at a glance</li>
               <li>Record payments with proof, receipts and audit trail</li>
-              <li>Collections performance and Google Sheet backups</li>
+              <li>Team Performance (calls and collections) and Google Sheet backups</li>
             </ul>
             <div className="hub-card-foot">
               {emiPulse?.overdue > 0 && <span className="hub-pill hub-pill-alert">{emiPulse.overdue} overdue</span>}

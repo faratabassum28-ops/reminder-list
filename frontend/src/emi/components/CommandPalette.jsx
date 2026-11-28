@@ -28,7 +28,7 @@ export default function CommandPalette({ nav, onClose, onStudent, onTheme, onSho
       { g: 'Go to', icon: 'home', label: 'Home', run: () => go('/') },
       { g: 'Go to', icon: 'calendar', label: 'EMI Tracker', sub: 'Overdue and due today', run: () => go('/tracker') },
       ...(can.verify ? [{ g: 'Go to', icon: 'shield', label: 'Verify payments', run: () => go('/verify') }] : []),
-      ...(can.manage ? [{ g: 'Go to', icon: 'users', label: 'Team performance', run: () => go('/performance') }, { g: 'Go to', icon: 'activity', label: 'Activity log', run: () => go('/activity') }, { g: 'Go to', icon: 'upload', label: 'Import students', run: () => go('/import') }, { g: 'Go to', icon: 'settings', label: 'Settings', run: () => go('/settings') }] : []),
+      ...(can.manage ? [{ g: 'Go to', icon: 'users', label: 'Team Performance', run: () => go('/performance') }, { g: 'Go to', icon: 'activity', label: 'Activity log', run: () => go('/activity') }, { g: 'Go to', icon: 'upload', label: 'Import students', run: () => go('/import') }, { g: 'Go to', icon: 'settings', label: 'Settings', run: () => go('/settings') }] : []),
       ...(can.admin ? [{ g: 'Go to', icon: 'database', label: 'Backup & restore', sub: 'Keep your data safe', run: () => go('/backup') }] : []),
       ...(nav || []).flatMap((p) => [
         { g: 'Programs', icon: 'book', label: p.name, run: () => go(`/p/${p._id}`) },

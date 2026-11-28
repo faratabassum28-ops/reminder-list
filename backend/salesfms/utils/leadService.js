@@ -305,22 +305,45 @@ export function cleanAssign(a) {
   }
   return out;
 }
-// who can receive in this column: ticked + present people. A column that was never set up = every active caller, equal shares
-// (that is how auto-assign worked before this setting existed).
+// Everyone who can take work right now (active people who have this app), lower-case name -> the name as the team knows it.
+async function activeNameMap() {
+  const m = new Map();
+  for (const u of await Team.active()) { const n = leadCallerName(u); if (n && !m.has(n.toLowerCase())) m.set(n.toLowerCase(), n); }
+  return m;
+}
+// who can receive in this column: ticked + present people WHO ARE STILL ON THE TEAM (someone switched off on the Users page, or
+// who lost the app, must stop receiving leads even if the column still lists them). A column that was never set up = every
+// active caller, equal shares (that is how auto-assign worked before this setting existed).
 async function eligible(q) {
   if (!q.people?.length) return (await callerNames()).map((name) => ({ name, share: 1 }));
-  return q.people.filter((p) => p.on && p.present && p.share > 0);
+  const active = await activeNameMap();
+  return q.people.filter((p) => p.on && p.present && p.share > 0 && active.has(p.name.toLowerCase())).map((p) => ({ ...p, name: active.get(p.name.toLowerCase()) }));
 }
-// today's hand-outs per column — the ratio is kept fair within a day, so someone who was away is not flooded when they come back
+// A sheet cell like "-", "NA" or "Unassigned" is NOT a person: it must not stop the automatic assignment.
+const NOT_A_NAME = /^(?:[-–—.?_]+|n\/?a|none|nil|null|no one|nobody|unassigned|not assigned|tbd|tba|pending)$/i;
+export const cleanAsg = (v) => { const t = String(v ?? "").replace(/\s+/g, " ").trim(); return NOT_A_NAME.test(t) ? "" : t; };
+
+// today's hand-outs per column — the ratio is kept fair within a day, so someone who was away is not flooded when they come back.
+// Names are stored with "." and "$" escaped: a caller called "Dr. Mehta" used to break the save (MongoDB treats "." as a path),
+// the error was swallowed, and every import then started from zero — so the first person in the list got everything.
 const ASSIGN_STATE = "assignState";
+const enc = (n) => String(n).replace(/[%.$]/g, (c) => ({ "%": "%25", ".": "%2E", "$": "%24" }[c]));
+const dec = (n) => String(n).replace(/%(25|2E|24)/g, (_, h) => ({ 25: "%", "2E": ".", 24: "$" }[h]));
+const decodeKeys = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [dec(k), v]));
 const loadState = async () => {
   const s = (await LeadConfig.findById(ASSIGN_STATE).lean())?.v, today = dateKey(new Date());
-  return s && s.date === today ? s : { date: today, counts: {} };
+  if (!s || s.date !== today) return { date: today, counts: {}, last: {} };
+  const out = { date: today, counts: {}, last: {} };
+  for (const q of QUEUES) { out.counts[q] = decodeKeys(s.counts?.[q]); out.last[q] = decodeKeys(s.last?.[q]); }
+  return out;
 };
+let stamp = 0; const nextStamp = () => (stamp = Math.max(Date.now(), stamp + 1));
 export async function assigner(queue, cfgIn) {
   const cfg = cfgIn || (await getCfg()), q = cfg.assign.queues[queue], state = await loadState();
-  const counts = (state.counts[queue] ||= {});
+  const counts = (state.counts[queue] ||= {}), last = (state.last[queue] ||= {});
+  const delta = {}, stamps = {}; let wiped = false;
   const on = q.mode === "auto" ? await eligible(q) : [];
+  const ratio = (p) => (counts[p.name] || 0) / p.share;
   return {
     on: on.length > 0,
     mode: q.mode,
@@ -328,12 +351,31 @@ export async function assigner(queue, cfgIn) {
     pick(prefer) {
       if (!on.length) return "";
       let c = prefer && cfg.assign.keepSame ? on.find((p) => p.name.toLowerCase() === String(prefer).toLowerCase()) : null;
-      if (!c) c = on.reduce((b, p) => ((counts[p.name] || 0) / p.share < (counts[b.name] || 0) / b.share ? p : b));
+      // fewest so far (by share); on a tie the person who was given work LEAST RECENTLY goes first, so a quiet day does not
+      // always start with the same name at the top of the list
+      if (!c) c = on.reduce((b, p) => { const rp = ratio(p), rb = ratio(b); return rp < rb || (rp === rb && (last[p.name] || 0) < (last[b.name] || 0)) ? p : b; });
       counts[c.name] = (counts[c.name] || 0) + 1;
+      delta[c.name] = (delta[c.name] || 0) + 1;
+      last[c.name] = stamps[c.name] = nextStamp();
       return c.name;
     },
-    reset() { for (const k of Object.keys(counts)) delete counts[k]; },
-    save: () => LeadConfig.findByIdAndUpdate(ASSIGN_STATE, { v: state }, { upsert: true }).catch(() => {}),
+    reset() { for (const k of Object.keys(counts)) delete counts[k]; for (const k of Object.keys(delta)) delete delta[k]; wiped = true; },
+    // Saved as increments, never as a whole-document overwrite: an import, a payment and a manual "add lead" can run at the same
+    // moment, and each one used to overwrite the others' counts with its own stale copy.
+    async save() {
+      if (!wiped && !Object.keys(delta).length) return;
+      try {
+        const path = `v.counts.${queue}`;
+        // a new day starts a fresh document (a duplicate-key error just means today's document already exists)
+        await LeadConfig.updateOne({ _id: ASSIGN_STATE, "v.date": { $ne: state.date } }, { $set: { v: { date: state.date, counts: {}, last: {} } } }, { upsert: true }).catch((e) => { if (e.code !== 11000) throw e; });
+        if (wiped) await LeadConfig.updateOne({ _id: ASSIGN_STATE }, { $set: { [path]: {} } });
+        const $inc = {}, $set = {};
+        for (const [n, c] of Object.entries(delta)) { $inc[`${path}.${enc(n)}`] = c; $set[`v.last.${queue}.${enc(n)}`] = stamps[n]; }
+        if (Object.keys($inc).length) await LeadConfig.updateOne({ _id: ASSIGN_STATE }, { $inc, $set });
+        for (const k of Object.keys(delta)) delete delta[k];
+        wiped = false;
+      } catch (e) { console.error("[assign] could not save today's hand-out counts:", e.message); }
+    },
   };
 }
 // Deal n items to people by a ratio, exactly: 100 items at 2 : 1 : 1 -> 50 / 25 / 25 (the leftovers go to the biggest remainders).
@@ -369,6 +411,24 @@ export function autoAssignDay(l, d, A) {
   if (!name) return;
   l[`d${d}Assigned`] = name; l[`d${d}By`] = "auto";
   trail(l, "assign", `Day ${d} calls assigned to ${name} (automatic)`);
+}
+// Leads that came in while nobody was ticked / present (or while the column was on Manual) stay unassigned for ever otherwise,
+// because the import only assigns a lead the moment it is created. This hands them out as soon as somebody can take them.
+export async function assignUnassigned(cfgIn) {
+  const cfg = cfgIn || (await getCfg()), A = await assigner("new", cfg);
+  if (!A.on) return 0;
+  const now = new Date(), ops = [];
+  const filter = { locked: { $ne: true }, $or: [{ assignedTo: { $exists: false } }, { assignedTo: null }, { assignedTo: "" }], fus: { $not: { $elemMatch: { actual: { $ne: null } } } } };
+  for await (const l of Lead.find(filter, "assignedTo").sort({ ts: 1 }).limit(2000).lean().cursor()) {
+    const name = A.pick("");
+    if (!name) break;
+    ops.push({ updateOne: { filter: { _id: l._id }, update: { $set: { assignedTo: name, assignedBy: "auto", assignedAt: now }, $push: { trail: trailOp("assign", `Assigned to ${name} (automatic)`) } } } });
+    if (ops.length >= 500) await Lead.bulkWrite(ops.splice(0));
+  }
+  const n = ops.length;
+  if (ops.length) await Lead.bulkWrite(ops);
+  await A.save();
+  return n;
 }
 // "Share out again": re-deal the OPEN leads of one column (nobody has called yet; not hand-assigned by an admin) by the ratio
 export async function reshare(queue) {
@@ -519,7 +579,7 @@ export async function syncIntake(by = null) {
     const wsCanon = new Map((await Lead.distinct("workshop")).filter(Boolean).map((w) => [w.toLowerCase(), w]));
     const canonWs = (v) => { const w = cleanWorkshop(v); if (!w) return ""; if (!wsCanon.has(w.toLowerCase())) wsCanon.set(w.toLowerCase(), w); return wsCanon.get(w.toLowerCase()); };
 
-    const A = await assigner("new", cfg);
+    const A = await assigner("new", cfg), teamNames = await activeNameMap();
     let added = 0, updated = 0, byEmailMatched = 0, again = 0;
     const newLeads = []; // leads created by THIS import (used to send the arrival WhatsApp)
     const touched = new Set(); // leads already handled in this import
@@ -529,7 +589,7 @@ export async function syncIntake(by = null) {
      try { // one bad row must never stop the other leads from arriving
       const f = { name: cell(r, ix.name), email: cell(r, ix.email), utwDate: cell(r, ix.utw), level: cell(r, ix.lvl), profession: cell(r, ix.pro), city: cell(r, ix.city), workshop: canonWs(cell(r, ix.ws)), waLink: cell(r, ix.link) };
       const sentCell = cell(r, ix.sent); // "Sent …": a message (e.g. from Pabbly) already went out for this row — never send it again
-      const sheetAsg = cell(r, ix.asg), ten = phone.slice(-10), mail = normEmail(f.email);
+      const sheetAsgRaw = cleanAsg(cell(r, ix.asg)), sheetAsg = teamNames.get(sheetAsgRaw.toLowerCase()) || sheetAsgRaw, ten = phone.slice(-10), mail = normEmail(f.email);
       // Everyone this person has been so far: same phone, or the same email (typed with a new phone number)
       const byTen = existing.get(ten) || [], cands = [...new Set([...byTen, ...(mail ? existingMail.get(mail) || [] : [])])];
       const viaEmail = !byTen.length && cands.length > 0;
@@ -579,7 +639,8 @@ export async function syncIntake(by = null) {
      } catch (e) { rowErrors.push(`${phone}: ${e.code === 11000 ? "duplicate registration" : e.message}`); console.error("[sheet] row skipped:", phone, e.message); }
     }
     await A.save();
-    const res = { added, updated, byEmailMatched, again, rows: data.length, ok: true, ...(rowErrors.length ? { rowErrors: rowErrors.slice(0, 5), skippedRows: rowErrors.length } : {}) };
+    const swept = await assignUnassigned(cfg).catch((e) => { console.error("[sheet] could not assign waiting leads:", e.message); return 0; });
+    const res = { added, updated, byEmailMatched, again, rows: data.length, ok: true, ...(swept ? { assignedWaiting: swept } : {}), ...(rowErrors.length ? { rowErrors: rowErrors.slice(0, 5), skippedRows: rowErrors.length } : {}) };
     await saveSync(res);
     // every click is logged; the silent 5-minute run only when it changed something (or when it is working again after failures)
     const back = prev && prev.ok === false && !by;
@@ -885,8 +946,9 @@ export async function getShare() {
 // keep "Automatic assignment" (new leads) in step: team members take part, people off today are not present
 async function applyShareToAssign(st) {
   const cur = (await getCfg()).assign || DEF.assign, queues = { ...cur.queues };
-  const people = st.callers.map((name) => ({ name, on: st.people.includes(name), share: 1, present: !st.off.includes(name) }));
-  for (const k of QUEUES) if (k === "new" || queues[k]?.mode === "auto") queues[k] = { mode: "auto", people: people.map((p) => ({ ...p })) };
+  // keep each person's Share (the ratio set in Settings): this used to reset everybody to 1 every midnight
+  const people = (k) => st.callers.map((name) => ({ name, on: st.people.includes(name), share: (queues[k]?.people || []).find((p) => p.name.toLowerCase() === name.toLowerCase())?.share || 1, present: !st.off.includes(name) }));
+  for (const k of QUEUES) if (k === "new" || queues[k]?.mode === "auto") queues[k] = { mode: "auto", people: people(k) };
   await LeadConfig.findByIdAndUpdate("main", { $set: { "v.assign": cleanAssign({ ...cur, queues }) } }, { upsert: true });
 }
 export async function saveShare(b = {}) {
