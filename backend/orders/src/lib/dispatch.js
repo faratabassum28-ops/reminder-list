@@ -1,14 +1,15 @@
 // Dispatch queue rules: pure functions only (no database, no network), so every rule can be unit-tested.
-// A confirmed order (DeskOrder.stage === 'dispatch') walks three steps, each with its own deadline:
-//   slip      Packing slip done      -> due by <time> on a working day
-//   packed    Order packed           -> form: AWB (filled from Shopify) + photo of the package
-//   handover  Order handed to courier -> form: photo of the manifest; the order then leaves the queue (stage 'dispatched' = In-transit orders)
+// A confirmed order (DeskOrder.stage === 'dispatch') walks four steps, each with its own deadline:
+//   slip      Packing slip done       -> the team picks Shipway / Shiprocket; the AWB is fetched, or typed by hand when the service has none yet
+//   manifest  Create manifest         -> one manifest per courier is created at the service for the orders that have an AWB
+//   packed    Order packed            -> the box is packed (photo optional); the AWB and manifest are already known
+//   handover  Order handed to courier -> photo of the manifest; the order then leaves the queue (stage 'dispatched' = In-transit orders)
 // The service (services/deskService.js) stores what these functions return.
 const { istParts, istToDate, startOfDay, fmtDate, parseYmd, DAY } = require('./istTime');
 const PR = require('./providers');
 
-const STEPS = ['slip', 'packed', 'handover'];
-const STEP_LABEL = { slip: 'Packing slip', packed: 'Order packed', handover: 'Order handover' };
+const STEPS = ['slip', 'manifest', 'packed', 'handover'];
+const STEP_LABEL = { slip: 'Packing slip', manifest: 'Create manifest', packed: 'Order packed', handover: 'Order handover' };
 const MAX_HANDOVER_BATCH = 50;
 const MAX_PHOTOS = 10; // photos per package, and per manifest
 
@@ -25,6 +26,7 @@ const DEFAULT_DISPATCH_CONFIG = {
   allowManualAwb: true,
   stages: {
     slip: { dueTime: '12:00', dayOffset: 0 },
+    manifest: { dueTime: '14:00', dayOffset: 0 },
     packed: { dueTime: '12:00', dayOffset: 0, requirePhoto: false },
     handover: { dueTime: '18:00', dayOffset: 0, requirePhoto: true },
   },
@@ -64,7 +66,7 @@ function normaliseDispatchConfig(body = {}, current = DEFAULT_DISPATCH_CONFIG) {
         if (!Number.isInteger(n) || n < 0 || n > 10) throw httpErr(400, `${STEP_LABEL[k]}: days must be a whole number from 0 to 10`);
         cur.dayOffset = n;
       }
-      if (s.requirePhoto !== undefined && k !== 'slip') cur.requirePhoto = !!s.requirePhoto;
+      if (s.requirePhoto !== undefined && (k === 'packed' || k === 'handover')) cur.requirePhoto = !!s.requirePhoto;
       next.stages[k] = cur;
     }
   }
@@ -131,47 +133,75 @@ function cleanProvider(raw) {
   return p;
 }
 
-function slipDone(doc, conf, who = { id: 'system', name: 'System' }, now = new Date(), input) {
-  if (stepOf(doc) !== 'slip' || isHeld(doc)) throw wrongStep(doc, 'slip');
-  const t = timing(doc, conf, now);
-  const provider = input === undefined ? null : cleanProvider(input.provider);
-  const dq = { ...(doc.dq || {}), step: 'packed', stepAt: now, slip: { at: now, byName: who.name, byId: who.id, ...t }, ...(provider ? { provider: { name: provider, at: now, byName: who.name, byId: who.id } } : {}) };
-  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'slip_done', label: `Packing slip done${provider ? ` · ${PR.labelOf(provider)}` : ''}${t.late ? ' (late)' : ''}` }] };
-}
-
-// Change which service an order ships through. Only at "Order packed", before an AWB is saved: the AWB belongs to the service that made it.
-// Needed for orders that were already past the slip step before Shiprocket existed (they count as Shipway), and for a wrong tap.
-function providerChanged(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
-  if (stepOf(doc) !== 'packed') {
-    throw httpErr(409, stepOf(doc) === 'slip'
-      ? `Order #${doc.orderId} is still at the packing slip: choose Shipway or Shiprocket when you press DONE.`
-      : `Order #${doc.orderId} already has an AWB, so its service cannot be changed any more. Refresh to see its latest step.`);
-  }
-  const to = cleanProvider(input.provider);
-  const from = PR.providerOf(doc);
-  if (to === from) throw httpErr(409, `Order #${doc.orderId} already ships through ${PR.labelOf(to)}.`);
-  const dq = { ...(doc.dq || {}), provider: { name: to, at: now, byName: who.name, byId: who.id, from }, shipCheck: null }; // the saved answer was from the other service
-  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'provider_switch', label: `Switched from ${PR.labelOf(from)} to ${PR.labelOf(to)}` }] };
-}
-
-// "Letters, digits and - _ /" only, 5 to 40 long. Upper-cased so the same AWB typed twice always matches.
+// An AWB the person typed (or the service gave): letters, digits and - _ / only, 5 to 40 long. Upper-cased so the same AWB typed twice always matches.
 function cleanAwb(raw) {
   const s = String(raw || '').replace(/\s+/g, '').toUpperCase();
   if (!/^[A-Z0-9\-_/]{5,40}$/.test(s)) throw httpErr(400, 'Enter the AWB number: letters and numbers, 5 to 40 characters');
   return s;
 }
+const cleanCourier = (raw) => String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+
+// The AWB and courier of an order: what the packing team typed or the service gave (dq.awb), else what was saved when it was packed (older orders).
+const awbOf = (doc) => {
+  const a = (doc && doc.dq && doc.dq.awb && doc.dq.awb.awb) || (doc && doc.dq && doc.dq.packed && doc.dq.packed.awb) || '';
+  const c = (doc && doc.dq && doc.dq.awb && doc.dq.awb.courier) || (doc && doc.dq && doc.dq.packed && doc.dq.packed.courier) || '';
+  return { awb: a, courier: c };
+};
+
+// input: { provider, awb?, courier? } = which service books this order, and (optionally) its AWB when the service had none to fetch.
+// Slip done moves the order to "Create manifest". The AWB may still be missing: the card then asks for it (fetch again, or type it).
+function slipDone(doc, conf, who = { id: 'system', name: 'System' }, now = new Date(), input) {
+  if (stepOf(doc) !== 'slip' || isHeld(doc)) throw wrongStep(doc, 'slip');
+  const t = timing(doc, conf, now);
+  const provider = input === undefined ? null : cleanProvider(input.provider);
+  const typed = input && input.awb ? { awb: cleanAwb(input.awb), courier: cleanCourier(input.courier) } : null;
+  const dq = {
+    ...(doc.dq || {}), step: 'manifest', stepAt: now,
+    slip: { at: now, byName: who.name, byId: who.id, ...t },
+    ...(provider ? { provider: { name: provider, at: now, byName: who.name, byId: who.id } } : {}),
+    ...(typed ? { awb: { ...typed, source: 'manual', at: now, byName: who.name, byId: who.id } } : {}),
+  };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'slip_done', label: `Packing slip done${provider ? ` · ${PR.labelOf(provider)}` : ''}${typed ? ` · AWB ${typed.awb} (typed)` : ''}${t.late ? ' (late)' : ''}` }] };
+}
+
+// Save the AWB of an order that is waiting for its manifest. "provider": the service gave it. "manual": a person typed it because the service had none.
+function awbSaved(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
+  if (stepOf(doc) !== 'manifest' || isHeld(doc)) throw wrongStep(doc, 'manifest');
+  const awb = cleanAwb(input.awb);
+  const courier = cleanCourier(input.courier);
+  if (!courier) throw httpErr(400, 'Enter the courier name too (for example Delhivery). The manifest is made per courier.');
+  const source = input.source === 'provider' ? 'provider' : 'manual';
+  const dq = { ...(doc.dq || {}), awb: { awb, courier, source, at: now, byName: who.name, byId: who.id }, shipCheck: null };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'awb', label: `AWB ${awb}${courier ? ` · ${courier}` : ''} ${source === 'manual' ? 'typed' : 'fetched'}` }] };
+}
+
+// Change which service an order ships through. Only at "Create manifest", before it is on a manifest: the AWB belongs to the service that made it.
+// Needed for orders that were already past the slip step before Shiprocket existed (they count as Shipway), and for a wrong tap.
+function providerChanged(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
+  if (stepOf(doc) !== 'manifest') {
+    throw httpErr(409, stepOf(doc) === 'slip'
+      ? `Order #${doc.orderId} is still at the packing slip: choose Shipway or Shiprocket when you press DONE.`
+      : `Order #${doc.orderId} is already on a manifest, so its service cannot be changed any more. Refresh to see its latest step.`);
+  }
+  const to = cleanProvider(input.provider);
+  const from = PR.providerOf(doc);
+  if (to === from) throw httpErr(409, `Order #${doc.orderId} already ships through ${PR.labelOf(to)}.`);
+  const dq = { ...(doc.dq || {}), provider: { name: to, at: now, byName: who.name, byId: who.id, from }, shipCheck: null, awb: null }; // the saved answers belong to the other service
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'provider_switch', label: `Switched from ${PR.labelOf(from)} to ${PR.labelOf(to)}` }] };
+}
 
 // One photo (photoId / manifestId) or several (photoIds / manifestIds): the first one is kept in photoId / manifestId too, so older screens still find it.
 const idsOf = (many, one) => [...new Set((Array.isArray(many) && many.length ? many : one ? [one] : []).map(String).filter(Boolean))];
 
-// input: { awb, courier, photoIds } (photoId still works for one photo)
+// Order packed: the box is packed. The AWB and the manifest were settled in the steps before, so nothing is typed here. input: { photoIds } (photoId still works for one photo)
 function packedDone(doc, input = {}, conf, who = { id: 'system', name: 'System' }, now = new Date()) {
   if (stepOf(doc) !== 'packed' || isHeld(doc)) throw wrongStep(doc, 'packed');
-  const awb = cleanAwb(input.awb);
+  const known = awbOf(doc);
+  const awb = cleanAwb(input.awb || known.awb);
   const photoIds = idsOf(input.photoIds, input.photoId);
   if (photoIds.length > MAX_PHOTOS) throw httpErr(400, `Add at most ${MAX_PHOTOS} photos`);
-  // Order packed needs only the AWB: no package photo is required (photos are still accepted if sent).
-  const courier = String(input.courier || '').trim().slice(0, 60);
+  if (conf.stages.packed.requirePhoto && !photoIds.length) throw httpErr(400, 'Add at least one photo of the packed box first');
+  const courier = cleanCourier(input.courier || known.courier);
   const t = timing(doc, conf, now);
   const dq = { ...(doc.dq || {}), step: 'handover', stepAt: now, packed: { at: now, byName: who.name, byId: who.id, awb, courier, photoId: photoIds[0] || null, photoIds, ...t } };
   return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'packed', label: `Order packed · AWB ${awb}${t.late ? ' (late)' : ''}` }] };
@@ -196,27 +226,28 @@ function handoverDone(doc, input = {}, conf, who = { id: 'system', name: 'System
 }
 
 // ------------------------------------------------------------------------------------------------ manifests
-// A manifest is created in Shipway by this app for every packed order of one courier (step 'handover', not on hold, not yet on a manifest).
-// The order stays at 'handover': the manifest id only groups it. One photo of the manifest then hands the whole group over.
+// A manifest is created at the service by this app for every order of one courier that is at 'manifest' with an AWB (not on hold, not yet on a manifest).
+// Putting an order on a manifest moves it to 'packed'. The manifest id then groups the orders at 'handover': one photo of the manifest hands the whole group over.
 const manifestOf = (doc) => (doc && doc.dq && doc.dq.manifest && doc.dq.manifest.id) || '';
 const manifestError = (doc) => (doc && doc.dq && doc.dq.manifestError && doc.dq.manifestError.message ? doc.dq.manifestError : null);
 const sameCourier = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
-const eligibleForManifest = (doc) => stepOf(doc) === 'handover' && !isHeld(doc) && !manifestOf(doc);
+// Needs an AWB and a courier name: the manifest is made per courier from the AWBs.
+const eligibleForManifest = (doc) => stepOf(doc) === 'manifest' && !isHeld(doc) && !manifestOf(doc) && !!awbOf(doc).awb && !!awbOf(doc).courier;
 
 function manifestAssigned(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
-  if (stepOf(doc) !== 'handover' || isHeld(doc)) throw wrongStep(doc, 'handover');
+  if (stepOf(doc) !== 'manifest' || isHeld(doc)) throw wrongStep(doc, 'manifest');
   const id = String(input.manifestId || '').trim().slice(0, 60);
   if (!id) throw httpErr(400, 'Shipway sent no manifest id');
   if (manifestOf(doc)) throw httpErr(409, `Order #${doc.orderId} is already on manifest ${manifestOf(doc)}.`);
   const courier = String(input.courier || '').trim().slice(0, 60);
   const provider = PR.providerOf(doc); // a manifest always belongs to the order's own provider
   const url = /^https?:\/\//i.test(String(input.url || '')) ? String(input.url).slice(0, 500) : '';
-  const dq = { ...(doc.dq || {}), manifest: { id, courier, provider, url, at: now, byName: who.name, byId: who.id }, manifestError: null };
+  const dq = { ...(doc.dq || {}), step: 'packed', stepAt: now, manifest: { id, courier, provider, url, at: now, byName: who.name, byId: who.id }, manifestError: null };
   return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'manifest', label: `Added to ${PR.labelOf(provider)} manifest ${id}${courier ? ` (${courier})` : ''}` }] };
 }
 
 function manifestRejected(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
-  if (stepOf(doc) !== 'handover' || isHeld(doc)) throw wrongStep(doc, 'handover');
+  if (stepOf(doc) !== 'manifest' || isHeld(doc)) throw wrongStep(doc, 'manifest');
   const message = String(input.reason || `${PR.labelOf(PR.providerOf(doc))} rejected this order`).replace(/\s+/g, ' ').trim().slice(0, 300);
   const courier = String(input.courier || '').trim().slice(0, 60);
   const dq = { ...(doc.dq || {}), manifestError: { message, courier, at: now, byName: who.name } };
@@ -234,16 +265,17 @@ function groupByManifest(cards) {
   }
   return { groups: [...groups.values()].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)), loose };
 }
-// Which couriers can get a manifest now: [{ courier, count }]. Orders without a courier name cannot be put on a manifest.
+// Which couriers can get a manifest now: [{ courier, count, orders }]. Orders without an AWB or a courier name cannot be put on a manifest (see eligibleForManifest).
 function manifestCouriers(docs, provider) {
   const m = new Map();
   for (const d of docs) {
     if (!eligibleForManifest(d)) continue;
     if (provider && PR.providerOf(d) !== provider) continue; // each provider makes its own manifests
-    const c = String((d.dq && d.dq.packed && d.dq.packed.courier) || '').trim();
+    const { awb, courier } = awbOf(d);
+    const c = String(courier || '').trim();
     if (!c) continue;
     const k = c.toLowerCase(); const cur = m.get(k) || { courier: c, count: 0, orders: [] };
-    cur.count += 1; cur.orders.push({ orderId: d.orderId, awb: (d.dq.packed && d.dq.packed.awb) || '' }); m.set(k, cur);
+    cur.count += 1; cur.orders.push({ orderId: d.orderId, awb: awb || '' }); m.set(k, cur);
   }
   return [...m.values()].map((x) => ({ ...x, orders: x.orders.sort((a, b) => a.orderId - b.orderId) })).sort((a, b) => b.count - a.count || a.courier.localeCompare(b.courier));
 }
@@ -277,9 +309,9 @@ function resumeOrder(doc, input = {}, who = { id: 'system', name: 'System' }, no
 }
 
 // ------------------------------------------------------------------------------------------------ numbers for the tab bar and the board
-// docs: DeskOrder rows in stage 'dispatch'. Returns { slip, packed, handover, overdue, overdueBy: {slip, packed, handover} }
+// docs: DeskOrder rows in stage 'dispatch'. Returns { slip, manifest, packed, handover, overdue, overdueBy }
 function stepCounts(docs, conf, now = new Date()) {
-  const out = { slip: 0, packed: 0, handover: 0, hold: 0, overdue: 0, overdueBy: { slip: 0, packed: 0, handover: 0 }, byProvider: { shipway: { packed: 0, handover: 0 }, shiprocket: { packed: 0, handover: 0 } } };
+  const out = { slip: 0, manifest: 0, packed: 0, handover: 0, hold: 0, overdue: 0, overdueBy: { slip: 0, manifest: 0, packed: 0, handover: 0 }, byProvider: { shipway: { manifest: 0, packed: 0, handover: 0 }, shiprocket: { manifest: 0, packed: 0, handover: 0 } } };
   for (const d of docs) {
     const step = stepOf(d); if (!step) continue;
     if (isHeld(d)) { out.hold++; continue; } // on hold: not in a column, never overdue
@@ -298,5 +330,5 @@ module.exports = {
   STEPS, STEP_LABEL, MAX_HANDOVER_BATCH, MAX_PHOTOS, DEFAULT_DISPATCH_CONFIG, httpErr, idsOf,
   normaliseDispatchConfig, isWorkingDay, nextWorkingDay, dueFor, stepOf, stepStart, dueAt,
   manifestOf, manifestError, eligibleForManifest, sameCourier, manifestAssigned, manifestRejected, groupByManifest, manifestCouriers,
-  slipDone, cleanProvider, providerChanged, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
+  slipDone, awbSaved, awbOf, cleanCourier, cleanProvider, providerChanged, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
 };

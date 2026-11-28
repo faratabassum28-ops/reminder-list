@@ -8,7 +8,7 @@ import { notifyDesk, useLabels } from './shared.jsx';
 const GROUPS = [
   { title: 'Confirm queue', kind: 'confirmation', slots: [['confirm1', 'fu1'], ['confirm2', 'fu2'], ['confirm3', 'fu3']] },
   { title: 'Pending orders', kind: 'confirmation', slots: [['pending1', 'day1'], ['pending2', 'day2'], ['pending3', 'day3']] },
-  { title: 'Dispatch queue', kind: 'packing', slots: [['slip', 'stepSlip'], ['packed', 'stepPacked'], ['handover', 'stepHandover']] },
+  { title: 'Dispatch queue', kind: 'packing', slots: [['slip', 'stepSlip'], ['manifest', 'stepManifest'], ['packed', 'stepPacked'], ['handover', 'stepHandover']] },
 ];
 const MODES = [['off', 'Off', 'Everyone sees every order.'], ['manual', 'Manual', 'An admin gives each order to a person, or a person takes it.'], ['auto', 'Auto', 'Orders are shared out by themselves, in the ratio below.']];
 const ratioText = (members, name) => {

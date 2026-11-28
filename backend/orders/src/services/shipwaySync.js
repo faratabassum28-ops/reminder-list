@@ -136,7 +136,7 @@ async function ensureFresh(orderId, maxAgeMin = 10) {
 }
 
 
-// ---------------------------------------------------------------------------- shipping status of the orders at "Order packed"
+// ---------------------------------------------------------------------------- shipping status of the orders at "Create manifest"
 const clean = (v) => (v === undefined || v === null ? '' : String(v).trim());
 const checkState = { runningSince: 0 };
 const checkRunning = () => !!checkState.runningSince && Date.now() - checkState.runningSince < STALE_MS;
@@ -163,17 +163,17 @@ async function shipState(orderId, provider) {
   }
 }
 
-// Ask the right service about every order at "Order packed" and save the answer on the order (dq.shipCheck), so the card shows it.
+// Ask the right service about every order at "Create manifest" and save the answer on the order (dq.shipCheck), so the card shows it.
 // onlyStale: skip orders checked in the last 30 minutes (the background run). A login problem stops that service only; the other carries on.
 async function checkPacked({ onlyStale = false, limit = 300, provider = null } = {}) {
   if (!anyConfigured()) throw Object.assign(new Error('Neither Shipway nor Shiprocket is set up yet. Add a login on the server.'), { status: 400 });
   if (checkRunning()) throw Object.assign(new Error('A shipping status check is already running. Try again in a moment.'), { status: 409 });
   checkState.runningSince = Date.now();
   try {
-    let docs = await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'packed' }).select('orderId dq.provider dq.shipCheck').lean();
+    let docs = await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'manifest' }).select('orderId dq.provider dq.shipCheck dq.awb').lean();
     if (provider) docs = docs.filter((d) => P.providerOf(d) === provider);
     if (onlyStale) docs = docs.filter((d) => SS.isStale(d.dq && d.dq.shipCheck));
-    const all = docs.map((d) => ({ orderId: d.orderId, provider: P.providerOf(d) }));
+    const all = docs.map((d) => ({ orderId: d.orderId, provider: P.providerOf(d), typed: !!(d.dq && d.dq.awb && d.dq.awb.source === 'manual') }));
     const skipped = all.filter((w) => !configured(w.provider));
     const work = all.filter((w) => configured(w.provider)).slice(0, limit);
     const rows = []; const dead = new Map(); const queue = [...work];
@@ -184,9 +184,12 @@ async function checkPacked({ onlyStale = false, limit = 300, provider = null } =
         try {
           const r = await shipState(w.orderId, w.provider);
           const at = new Date();
-          // only write if the card is still at Order packed with the same service: it may have been switched or moved on meanwhile
-          const filter = { orderId: w.orderId, stage: 'dispatch', 'dq.step': 'packed', ...(w.provider === 'shiprocket' ? { 'dq.provider.name': 'shiprocket' } : { 'dq.provider.name': { $ne: 'shiprocket' } }) };
-          await DeskOrder.updateOne(filter, { $set: { 'dq.shipCheck': { state: r.state, status: r.status || '', awb: r.awb || '', courier: r.courier || '', at } } });
+          // only write if the card is still at Create manifest with the same service: it may have been switched or moved on meanwhile
+          const filter = { orderId: w.orderId, stage: 'dispatch', 'dq.step': 'manifest', ...(w.provider === 'shiprocket' ? { 'dq.provider.name': 'shiprocket' } : { 'dq.provider.name': { $ne: 'shiprocket' } }) };
+          const set = { 'dq.shipCheck': { state: r.state, status: r.status || '', awb: r.awb || '', courier: r.courier || '', at } };
+          // an AWB the service gave is kept on the order (a typed one is never overwritten), so Create manifest can use it
+          if (r.state === 'awb_ready' && r.awb && !w.typed) set['dq.awb'] = { awb: r.awb, courier: r.courier || '', source: 'provider', at, byName: 'Auto', byId: 'system' };
+          await DeskOrder.updateOne(filter, { $set: set });
           rows.push({ orderId: w.orderId, provider: w.provider, state: r.state });
         } catch (e) { dead.set(w.provider, e); }
         await sleep(100);

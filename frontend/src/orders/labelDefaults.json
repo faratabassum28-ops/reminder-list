@@ -19,6 +19,7 @@
  "day2": "Day 2",
  "day3": "Day 3",
  "stepSlip": "Packing slip",
+ "stepManifest": "Create manifest",
  "stepPacked": "Order packed",
  "stepHandover": "Order handover",
  "btnCall": "Call",

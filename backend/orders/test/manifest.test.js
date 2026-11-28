@@ -6,7 +6,7 @@ const { parseManifestReply } = require('../src/lib/manifest');
 const conf = P.normaliseDispatchConfig({}, P.DEFAULT_DISPATCH_CONFIG);
 const who = { id: 'u1', name: 'Ravi' };
 const at = new Date('2026-10-19T09:00:00+05:30');
-const packedDoc = (id, courier = 'Delhivery', extra = {}) => ({ orderId: id, stage: 'dispatch', confirmedAt: at, dq: { step: 'handover', stepAt: at, packed: { awb: `AWB${id}00`, courier }, ...extra } });
+const packedDoc = (id, courier = 'Delhivery', extra = {}) => ({ orderId: id, stage: 'dispatch', confirmedAt: at, dq: { step: 'manifest', stepAt: at, awb: { awb: `AWB${id}00`, courier }, ...extra } });
 const apply = (d, t) => ({ ...d, ...t.set });
 const sent = [{ orderId: 1501, shipwayId: '1501' }, { orderId: 1502, shipwayId: '1502' }, { orderId: 1503, shipwayId: '1503' }];
 
@@ -50,22 +50,25 @@ test('a rejection without a reason still says so', () => {
   assert.equal(r.rejected[0].reason, 'Shipway rejected this order (no reason given)');
 });
 
-test('manifestAssigned saves the id and keeps the order at handover', () => {
+test('manifestAssigned saves the id and moves the order on to Order packed', () => {
   const d = packedDoc(1501);
   const t = P.manifestAssigned(d, { manifestId: 'MF-1', courier: 'Delhivery' }, who);
   const next = apply(d, t);
-  assert.equal(P.stepOf(next), 'handover');
+  assert.equal(P.stepOf(next), 'packed');
   assert.equal(P.manifestOf(next), 'MF-1');
   assert.equal(t.entries[0].action, 'manifest');
-  assert.throws(() => P.manifestAssigned(next, { manifestId: 'MF-2' }, who), /already on manifest MF-1/);
+  assert.throws(() => P.manifestAssigned(next, { manifestId: 'MF-2' }, who), /at “Order packed”/); // an order is on one manifest only
+  assert.throws(() => P.manifestAssigned({ ...next, dq: { ...next.dq, step: 'manifest' } }, { manifestId: 'MF-2' }, who), /already on manifest MF-1/);
 });
 
-test('only packed, not-held, un-manifested orders can get a manifest', () => {
+test('only orders at Create manifest with an AWB and courier, not held, not yet on a manifest, can get a manifest', () => {
   assert.equal(P.eligibleForManifest(packedDoc(1)), true);
-  assert.equal(P.eligibleForManifest({ ...packedDoc(1), dq: { step: 'packed' } }), false);
+  assert.equal(P.eligibleForManifest({ ...packedDoc(1), dq: { step: 'packed', awb: { awb: 'AWB100', courier: 'D' } } }), false); // already past the manifest
+  assert.equal(P.eligibleForManifest({ ...packedDoc(1), dq: { step: 'manifest' } }), false); // no AWB yet
+  assert.equal(P.eligibleForManifest(packedDoc(1, '')), false); // no courier name
   assert.equal(P.eligibleForManifest(packedDoc(1, 'X', { hold: { at, note: 'x' } })), false);
   assert.equal(P.eligibleForManifest(packedDoc(1, 'X', { manifest: { id: 'M' } })), false);
-  assert.throws(() => P.manifestAssigned({ ...packedDoc(1), dq: { step: 'slip' } }, { manifestId: 'M' }, who), /not “Order handover”|is at/);
+  assert.throws(() => P.manifestAssigned({ ...packedDoc(1), dq: { step: 'slip' } }, { manifestId: 'M' }, who), /at “Packing slip”/);
   assert.throws(() => P.manifestAssigned(packedDoc(1), {}, who), /no manifest id/);
 });
 
@@ -98,7 +101,7 @@ test('manifestCouriers counts only eligible orders, merging spellings', () => {
 });
 
 test('handover records the manifest id and still needs the one photo', () => {
-  const d = packedDoc(1501, 'Delhivery', { manifest: { id: 'MF-1' } });
+  const d = { ...packedDoc(1501, 'Delhivery', { manifest: { id: 'MF-1' } }), dq: { step: 'handover', stepAt: at, packed: { awb: 'AWB150100', courier: 'Delhivery' }, manifest: { id: 'MF-1' } } };
   assert.throws(() => P.handoverDone(d, {}, conf, who), /photo of the manifest/);
   const t = P.handoverDone(d, { manifestIds: ['photo1'] }, conf, who);
   assert.equal(t.set.dq.handover.manifestRef, 'MF-1');

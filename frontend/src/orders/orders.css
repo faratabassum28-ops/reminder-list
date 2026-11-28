@@ -1049,3 +1049,29 @@
   .oa-scope .dq-hhead .btn {width: 100%;}
   .oa-scope .ship-bar .ship-check {margin-left: 0; width: 100%;}
 }
+
+/* ---- the little "i": explanations live behind it so the page keeps its space ---- */
+.oa-scope .info {position: relative; display: inline-flex; vertical-align: middle;}
+.oa-scope .info-btn {width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1.5px solid var(--ink-3); background: var(--surface); color: var(--ink-2); font: italic 700 12px/1 Georgia, 'Times New Roman', serif; cursor: pointer; display: inline-grid; place-items: center;}
+.oa-scope .info-btn:hover, .oa-scope .info-btn[aria-expanded="true"] {background: var(--accent); border-color: var(--accent); color: #fff;}
+.oa-scope .info-pop {position: absolute; z-index: 40; top: calc(100% + 6px); left: -6px; width: min(340px, 78vw); padding: 10px 12px; border-radius: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(0,0,0,.18); font: 400 13px/1.45 inherit; font-style: normal; text-align: left; white-space: normal; display: grid; gap: 6px;}
+.oa-scope .info-pop.right {left: auto; right: -6px;}
+.oa-scope .info-pop b {font-weight: 700;}
+
+/* ---- Dispatch: cards go DOWN the page, one under another (never side by side) ---- */
+.oa-scope .dq-grid {grid-template-columns: minmax(0, 1fr) !important;}
+.oa-scope .dq-two {grid-template-columns: minmax(0, 1fr) !important;}
+.oa-scope .dq-hstep .dq-grid {grid-template-columns: minmax(0, 1fr) !important;}
+.oa-scope .dq-stage.manifest .dq-stagehead {border-left-color: var(--fu2);}
+.oa-scope .dq-stagehead.compact {padding: 10px 12px; gap: 4px;}
+.oa-scope .dq-stagehead .dq-title {display: flex; align-items: center; gap: 8px;}
+.oa-scope .dq-steptext small {display: none;}
+.oa-scope .dq-pboard-actions {display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;}
+.oa-scope .dq-pboard-actions .grow {flex: 1 1 auto;}
+.oa-scope .awb-form {display: grid; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--line-2);}
+.oa-scope .awb-form .row {display: grid; grid-template-columns: 1fr 1fr; gap: 8px;}
+@media (max-width: 700px) {.oa-scope .awb-form .row {grid-template-columns: 1fr;}}
+
+/* ---- Sidebar: the desk's own pages sit under "Shopify desk", so the place you are in is always the one lit ---- */
+.oa-scope .sd-titleline {display: flex; align-items: center; gap: 10px;}
+.oa-scope .sd .sd-top {padding-top: 14px;}

@@ -3,12 +3,15 @@ const assert = require('node:assert/strict');
 const P = require('../src/lib/dispatch');
 
 const ist = (s) => new Date(`${s}+05:30`); // IST wall clock
-const conf = P.normaliseDispatchConfig({}, P.DEFAULT_DISPATCH_CONFIG); // Mon-Sat, slip 12:00, packed 12:00, handover 18:00
+const conf = P.normaliseDispatchConfig({}, P.DEFAULT_DISPATCH_CONFIG); // Mon-Sat, slip 12:00, manifest 14:00, packed 12:00, handover 18:00
 const who = { id: 'u1', name: 'Ravi' };
 // 2026-10-17 is a Saturday, 2026-10-18 a Sunday, 2026-10-19 a Monday
 const confirmed = ist('2026-10-19T09:00:00');
 const doc = (extra = {}) => ({ orderId: 1500, stage: 'dispatch', confirmedAt: confirmed, orderAt: confirmed, ...extra });
 const apply = (d, t) => ({ ...d, ...t.set, log: [...(d.log || []), ...t.entries] });
+const slipWith = (d = doc(), awb = 'ABC12345', at) => apply(d, P.slipDone(d, conf, who, at, { provider: 'shipway', awb, courier: 'Delhivery' })); // slip done, AWB typed -> at Create manifest
+const manifested = (d = slipWith(), at) => apply(d, P.manifestAssigned(d, { manifestId: 'm1', courier: 'Delhivery' }, who, at)); // -> at Order packed
+const packed = (d = manifested(), at) => apply(d, P.packedDone(d, {}, conf, who, at)); // -> at Order handover
 
 // ------------------------------------------------------------ deadlines
 test('before the cut-off the step is due the same working day', () => {
@@ -53,27 +56,37 @@ test('settings are validated with plain messages', () => {
   assert.equal(P.normaliseDispatchConfig({ stages: { slip: { requirePhoto: true } } }, conf).stages.slip.requirePhoto, undefined); // the slip step has no photo
 });
 
-// ------------------------------------------------------------ the three steps
+// ------------------------------------------------------------ the four steps
 test('an order confirmed before this feature existed starts at the packing slip', () => {
   assert.equal(P.stepOf(doc()), 'slip');
   assert.equal(P.stepOf({ ...doc(), stage: 'confirm' }), null);
 });
 
-test('slip -> packed -> handover -> dispatched, each stamped with who and when', () => {
-  let d = doc();
-  d = apply(d, P.slipDone(d, conf, who, ist('2026-10-19T10:00:00')));
-  assert.equal(P.stepOf(d), 'packed');
-  assert.equal(d.dq.slip.byName, 'Ravi'); assert.equal(d.dq.slip.late, false);
-  assert.equal(P.dueAt(d, conf).getTime(), ist('2026-10-19T12:00:00').getTime()); // packed deadline counts from the slip
+test('the steps are slip, manifest, packed, handover in that order', () => {
+  assert.deepEqual(P.STEPS, ['slip', 'manifest', 'packed', 'handover']);
+});
 
-  d = apply(d, P.packedDone(d, { awb: ' 1491 0510 8234 ', courier: 'Delhivery', photoId: 'p1' }, conf, who, ist('2026-10-19T11:30:00')));
-  assert.equal(P.stepOf(d), 'handover'); assert.equal(d.dq.packed.awb, '1491 0510 8234'.replace(/ /g, ''));
+test('slip -> manifest -> packed -> handover -> dispatched, each stamped with who and when', () => {
+  let d = doc();
+  d = apply(d, P.slipDone(d, conf, who, ist('2026-10-19T10:00:00'), { provider: 'shipway' }));
+  assert.equal(P.stepOf(d), 'manifest');
+  assert.equal(d.dq.slip.byName, 'Ravi'); assert.equal(d.dq.slip.late, false);
+  assert.equal(P.dueAt(d, conf).getTime(), ist('2026-10-19T14:00:00').getTime()); // the manifest deadline counts from the slip
+
+  d = apply(d, P.awbSaved(d, { awb: ' 1491 0510 8234 ', courier: 'Delhivery' }, who, ist('2026-10-19T10:05:00')));
+  assert.equal(d.dq.awb.awb, '149105108234'); assert.equal(d.dq.awb.source, 'manual');
+  d = apply(d, P.manifestAssigned(d, { manifestId: 'm1', courier: 'Delhivery' }, who, ist('2026-10-19T11:00:00')));
+  assert.equal(P.stepOf(d), 'packed'); assert.equal(d.dq.manifest.id, 'm1');
+  assert.equal(P.dueAt(d, conf).getTime(), ist('2026-10-19T12:00:00').getTime()); // packed deadline counts from the manifest
+
+  d = apply(d, P.packedDone(d, { photoId: 'p1' }, conf, who, ist('2026-10-19T11:30:00')));
+  assert.equal(P.stepOf(d), 'handover'); assert.equal(d.dq.packed.awb, '149105108234'); assert.equal(d.dq.packed.courier, 'Delhivery');
   assert.equal(P.dueAt(d, conf).getTime(), ist('2026-10-19T18:00:00').getTime());
 
-  d = apply(d, P.handoverDone(d, { manifestId: 'm1' }, conf, who, ist('2026-10-19T17:00:00')));
+  d = apply(d, P.handoverDone(d, { manifestId: 'photo1' }, conf, who, ist('2026-10-19T17:00:00')));
   assert.equal(d.stage, 'dispatched'); assert.equal(d.dq.step, 'done');
-  assert.equal(d.dispatch.awb, '149105108234'); assert.equal(d.dispatch.courier, 'Delhivery'); assert.equal(d.dq.handover.manifestId, 'm1');
-  assert.equal(d.log[d.log.length - 1].action, 'dispatch'); // the Overview counts "dispatched" from this action
+  assert.equal(d.dispatch.awb, '149105108234'); assert.equal(d.dispatch.courier, 'Delhivery'); assert.equal(d.dq.handover.manifestId, 'photo1'); assert.equal(d.dq.handover.manifestRef, 'm1');
+  assert.equal(d.log[d.log.length - 1].action, 'dispatch'); // the Overview counts \"dispatched\" from this action
   assert.equal(P.stepOf(d), null);
 });
 
@@ -85,25 +98,39 @@ test('a step done after its deadline is recorded as late', () => {
 
 test('steps cannot be skipped or repeated', () => {
   const d = doc();
-  assert.throws(() => P.packedDone(d, { awb: 'ABC12345', photoId: 'p' }, conf, who), /at “Packing slip”/);
+  assert.throws(() => P.awbSaved(d, { awb: 'ABC12345', courier: 'D' }, who), /at “Packing slip”/);
+  assert.throws(() => P.manifestAssigned(d, { manifestId: 'm' }, who), /at “Packing slip”/);
+  assert.throws(() => P.packedDone(d, {}, conf, who), /at “Packing slip”/);
   assert.throws(() => P.handoverDone(d, { manifestId: 'm' }, conf, who), /not “Order handover”/);
-  const d2 = apply(d, P.slipDone(d, conf, who));
-  assert.throws(() => P.slipDone(d2, conf, who), /at “Order packed”/);
+  const d2 = slipWith(d);
+  assert.throws(() => P.slipDone(d2, conf, who), /at “Create manifest”/);
+  assert.throws(() => P.packedDone(d2, {}, conf, who), /at “Create manifest”, not “Order packed”/); // the manifest cannot be skipped
   assert.throws(() => P.slipDone({ ...d, stage: 'cancelled' }, conf, who), /no longer in the dispatch queue/);
 });
 
-test('Order packed needs a valid AWB and no photo', () => {
-  let d = apply(doc(), P.slipDone(doc(), conf, who));
-  assert.throws(() => P.packedDone(d, { awb: '', photoId: 'p' }, conf, who), /AWB/);
-  assert.throws(() => P.packedDone(d, { awb: 'AB', photoId: 'p' }, conf, who), /5 to 40/);
-  assert.throws(() => P.packedDone(d, { awb: 'AB 12$45', photoId: 'p' }, conf, who), /AWB/);
-  assert.equal(P.packedDone(d, { awb: 'ABC12345' }, conf, who).set.dq.packed.awb, 'ABC12345'); // no photo needed
-  const off = P.normaliseDispatchConfig({ stages: { packed: { requirePhoto: false } } }, conf);
-  assert.equal(P.packedDone(d, { awb: 'abc12345' }, off, who).set.dq.packed.awb, 'ABC12345'); // upper-cased
+test('the slip can be marked done without an AWB (the card then asks for it), and a typed AWB must be valid', () => {
+  const t = P.slipDone(doc(), conf, who, undefined, { provider: 'shiprocket' });
+  assert.equal(t.set.dq.awb, undefined); assert.equal(t.set.dq.step, 'manifest');
+  assert.throws(() => P.slipDone(doc(), conf, who, undefined, { provider: 'shipway', awb: 'AB 12$45', courier: 'D' }), /AWB/);
+  assert.throws(() => P.slipDone(doc(), conf, who, undefined, { provider: 'shipway', awb: 'AB', courier: 'D' }), /5 to 40/);
+  const d = apply(doc(), t);
+  assert.throws(() => P.awbSaved(d, { awb: 'ABC12345', courier: '' }, who), /courier/i);
+  assert.equal(P.awbSaved(d, { awb: 'abc12345', courier: ' Xpress  Bees ' }, who).set.dq.awb.awb, 'ABC12345'); // upper-cased
+  assert.equal(P.awbSaved(d, { awb: 'abc12345', courier: ' Xpress  Bees ' }, who).set.dq.awb.courier, 'Xpress Bees');
+  assert.equal(P.awbSaved(d, { awb: 'abc12345', courier: 'X', source: 'provider' }, who).set.dq.awb.source, 'provider');
+});
+
+test('Order packed needs nothing typed: the AWB comes from the earlier steps, photos are optional', () => {
+  const d = manifested();
+  assert.equal(P.packedDone(d, {}, conf, who).set.dq.packed.awb, 'ABC12345'); // no photo needed
+  assert.throws(() => P.packedDone(apply(doc(), P.slipDone(doc(), conf, who, undefined, { provider: 'shipway' })), {}, conf, who), /at “Create manifest”/);
+  const strict = P.normaliseDispatchConfig({ stages: { packed: { requirePhoto: true } } }, conf);
+  assert.throws(() => P.packedDone(d, {}, strict, who), /at least one photo/);
+  assert.equal(P.packedDone(d, { photoId: 'p' }, strict, who).set.dq.packed.photoId, 'p');
 });
 
 test('Order handover needs the manifest photo unless settings say otherwise', () => {
-  let d = doc(); d = apply(d, P.slipDone(d, conf, who)); d = apply(d, P.packedDone(d, { awb: 'ABC12345', photoId: 'p' }, conf, who));
+  const d = packed();
   assert.throws(() => P.handoverDone(d, {}, conf, who), /manifest/);
   const off = P.normaliseDispatchConfig({ stages: { handover: { requirePhoto: false } } }, conf);
   assert.equal(P.handoverDone(d, {}, off, who).set.stage, 'dispatched');
@@ -117,38 +144,38 @@ test('stepCounts: how many orders sit in each step, and how many are past their 
     doc({ orderId: 3, dq: { step: 'packed', stepAt: ist('2026-10-19T11:00:00') } }), // packed, due 12:00 -> overdue
     doc({ orderId: 4, dq: { step: 'handover', stepAt: ist('2026-10-19T12:10:00') } }), // handover, due 18:00
     doc({ orderId: 5, stage: 'confirm' }), // not in the queue
+    doc({ orderId: 6, dq: { step: 'manifest', stepAt: ist('2026-10-19T10:00:00') } }), // manifest, due 14:00
   ];
   const c = P.stepCounts(docs, conf, now);
-  assert.deepEqual([c.slip, c.packed, c.handover, c.overdue], [2, 1, 1, 2]);
-  assert.deepEqual(c.overdueBy, { slip: 1, packed: 1, handover: 0 });
+  assert.deepEqual([c.slip, c.manifest, c.packed, c.handover, c.overdue], [2, 1, 1, 1, 2]);
+  assert.deepEqual(c.overdueBy, { slip: 1, manifest: 0, packed: 1, handover: 0 });
 });
 
 test('timeLabel shows a 12-hour clock', () => {
   assert.equal(P.timeLabel('12:00'), '12:00 PM'); assert.equal(P.timeLabel('18:00'), '6:00 PM'); assert.equal(P.timeLabel('00:30'), '12:30 AM'); assert.equal(P.timeLabel('09:05'), '9:05 AM');
 });
 
-// ------------------------------------------------------------ several photos, AWB from Shipway
+// ------------------------------------------------------------ several photos
 test('several package photos are kept, the first is also kept as photoId, and one is enough', () => {
-  let d = doc(); d = apply(d, P.slipDone(d, conf, who));
-  const t = P.packedDone(d, { awb: 'ABC12345', courier: 'Delhivery', photoIds: ['p1', 'p2', 'p2', 'p3'] }, conf, who);
+  const d = manifested();
+  const t = P.packedDone(d, { courier: 'Delhivery', photoIds: ['p1', 'p2', 'p2', 'p3'] }, conf, who);
   assert.deepEqual(t.set.dq.packed.photoIds, ['p1', 'p2', 'p3']); assert.equal(t.set.dq.packed.photoId, 'p1');
-  assert.deepEqual(P.packedDone(d, { awb: 'ABC12345', photoIds: [] }, conf, who).set.dq.packed.photoIds, []);
-  assert.throws(() => P.packedDone(d, { awb: 'ABC12345', photoIds: Array.from({ length: 11 }, (_, i) => `p${i}`) }, conf, who), /at most 10/);
-  const off = P.normaliseDispatchConfig({ stages: { packed: { requirePhoto: false } } }, conf);
-  assert.deepEqual(P.packedDone(d, { awb: 'ABC12345', photoIds: [] }, off, who).set.dq.packed.photoIds, []);
+  assert.deepEqual(P.packedDone(d, { photoIds: [] }, conf, who).set.dq.packed.photoIds, []);
+  assert.throws(() => P.packedDone(d, { photoIds: Array.from({ length: 11 }, (_, i) => `p${i}`) }, conf, who), /at most 10/);
 });
 
 test('several manifest photos are kept for every order handed over', () => {
-  let d = doc(); d = apply(d, P.slipDone(d, conf, who)); d = apply(d, P.packedDone(d, { awb: 'ABC12345', photoId: 'p' }, conf, who));
+  const d = packed();
   const t = P.handoverDone(d, { manifestIds: ['m1', 'm2'] }, conf, who);
   assert.deepEqual(t.set.dq.handover.manifestIds, ['m1', 'm2']); assert.equal(t.set.dq.handover.manifestId, 'm1');
   assert.throws(() => P.handoverDone(d, { manifestIds: [] }, conf, who), /at least one photo/);
 });
 
-test('typing the AWB by hand is allowed by default and can be switched off', () => {
-  assert.equal(conf.allowManualAwb, true);
-  assert.equal(P.normaliseDispatchConfig({ allowManualAwb: false }, conf).allowManualAwb, false);
-  assert.equal(P.normaliseDispatchConfig({ holidays: [] }, P.normaliseDispatchConfig({ allowManualAwb: false }, conf)).allowManualAwb, false); // later saves keep it
+test('every step has its own deadline setting, and only Packed and Handover can ask for a photo', () => {
+  assert.deepEqual(conf.stages.manifest, { dueTime: '14:00', dayOffset: 0 });
+  assert.equal(P.normaliseDispatchConfig({ stages: { manifest: { dueTime: '15:30', dayOffset: 1 } } }, conf).stages.manifest.dueTime, '15:30');
+  assert.equal(P.normaliseDispatchConfig({ stages: { manifest: { requirePhoto: true } } }, conf).stages.manifest.requirePhoto, undefined);
+  assert.equal(P.normaliseDispatchConfig({ stages: { packed: { requirePhoto: true } } }, conf).stages.packed.requirePhoto, true);
 });
 
 // ------------------------------------------------------------ hold and resume
@@ -166,6 +193,7 @@ test('hold needs a note, keeps the step and pauses the deadline', () => {
 test('a held order cannot be moved along until it is resumed', () => {
   const held = apply(doc(), P.holdOrder(doc(), { note: 'Out of stock' }, who));
   assert.throws(() => P.slipDone(held, conf, who), (e) => e.status === 409 && /on hold/.test(e.message));
+  assert.throws(() => P.awbSaved({ ...held, dq: { ...held.dq, step: 'manifest' } }, { awb: 'AWB12345', courier: 'D' }, who), /on hold/);
   assert.throws(() => P.packedDone({ ...held, dq: { ...held.dq, step: 'packed' } }, { awb: 'AWB12345' }, conf, who), /on hold/);
   assert.throws(() => P.handoverDone({ ...held, dq: { ...held.dq, step: 'handover' } }, {}, conf, who), /on hold/);
 });

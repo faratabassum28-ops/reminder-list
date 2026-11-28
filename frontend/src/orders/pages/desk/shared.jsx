@@ -23,6 +23,25 @@ export function LabelsProvider({ children }) {
 }
 export const useLabels = () => useContext(LabelsCtx);
 
+// A small round "i": the explanation sits behind it, so the page keeps its space for the work. Click (or tap) to open, click elsewhere or press Esc to close.
+export function Info({ children, label = 'More information', align }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const off = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', off); document.addEventListener('touchstart', off); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', off); document.removeEventListener('touchstart', off); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return (
+    <span className="info" ref={ref}>
+      <button type="button" className="info-btn" aria-label={label} aria-expanded={open} onClick={() => setOpen((o) => !o)}>i</button>
+      {open && <span className={`info-pop ${align === 'right' ? 'right' : ''}`} role="note">{children}</span>}
+    </span>
+  );
+}
+
 // Live counts for the tab bar and the sidebar badge. Refreshes every 30 s and right after any action.
 export function useDeskCounts() {
   const [counts, setCounts] = useState(null);

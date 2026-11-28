@@ -195,10 +195,11 @@ const deskOrderSchema = new Schema({
   dispatch: { at: Date, byName: String, awb: String, courier: String, note: String },
   // Dispatch queue progress while stage === 'dispatch' (see lib/dispatch.js). Missing = still at the packing slip step.
   dq: {
-    step: String, // slip | packed | handover | done
+    step: String, // slip | manifest | packed | handover | done
     stepAt: Date, // when the current step began: its deadline is counted from here
     provider: { name: { type: String, enum: ['shipway', 'shiprocket'] }, at: Date, byName: String, byId: String, from: String }, // chosen when the packing slip is marked done: which service books and manifests this order
     slip: { at: Date, byName: String, byId: String, dueAt: Date, late: Boolean },
+    awb: { awb: String, courier: String, source: String, at: Date, byName: String, byId: String }, // the AWB: given by the service (source 'provider') or typed by the packing team ('manual'); set at the packing slip / Create manifest step
     packed: { at: Date, byName: String, byId: String, awb: String, courier: String, photoId: String, photoIds: [String], dueAt: Date, late: Boolean }, // photoIds: every photo of the package (photoId = the first)
     handover: { at: Date, byName: String, byId: String, manifestId: String, manifestIds: [String], manifestRef: String, dueAt: Date, late: Boolean }, // manifestIds: every photo of the manifest
     manifest: { id: String, courier: String, provider: String, url: String, at: Date, byName: String, byId: String }, // the Shipway / Shiprocket manifest this order was put on (we create it; Shipway cannot list it back)
@@ -214,6 +215,7 @@ const deskOrderSchema = new Schema({
 }, { timestamps: true, minimize: false });
 deskOrderSchema.index({ stage: 1, fuNo: 1, dueAt: 1 });
 deskOrderSchema.index({ 'assignee.id': 1, stage: 1 });
+deskOrderSchema.index({ 'dq.awb.awb': 1 }, { sparse: true });
 deskOrderSchema.index({ 'dq.packed.awb': 1 }, { sparse: true }); // "is this AWB already on another order?"
 const DeskOrder = conn.model('DeskOrder', deskOrderSchema);
 

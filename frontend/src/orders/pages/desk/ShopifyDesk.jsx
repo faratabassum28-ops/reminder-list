@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useToast } from '../../deskUi.jsx';
 import { useStaff } from '../../staff.jsx';
 import { hasRole, isAdmin, rolesOf } from '../../flowUi.js';
 import { deskHome } from './deskHome.js';
-import { LabelsProvider, notifyDesk, useDeskCounts, useLabels } from './shared.jsx';
+import { Info, LabelsProvider, notifyDesk, useDeskCounts, useLabels } from './shared.jsx';
 import { ConfirmQueue, PendingQueue } from './DeskQueue.jsx';
 import { PartialPaid, CancelledOrders } from './DeskLists.jsx';
 import DispatchBoard from './DispatchBoard.jsx';
 import TransitOrders from './TransitOrders.jsx';
 import DeskSettings from './DeskSettings.jsx';
 
-// Overview, Order funnel, Shopify orders and Order analysis moved to the sidebar. Tabs, in the order the team works an order: confirm calls, pending calls, dispatch (slip, packed, handover), in transit, then the side lists.
+// Every desk page (Confirm, Pending, Dispatch, In transit, Partial, Cancelled, Settings) now lives in the sidebar under "Shopify desk", so no tab bar takes up room here.
+// This list says who may open which page; the sidebar and the routes below both follow it.
 function tabsFor(user, c, L) {
   const n = (v) => (v ? v : null);
   const ALL = ['admin', 'confirmation', 'packing'];
@@ -54,20 +55,12 @@ function DeskInner() {
   return (
     <div className="sd">
       <div className="sd-top">
-        <div>
+        <div className="sd-titleline">
           <h1>{L('deskTitle')}</h1>
-          <p className="sd-sub">{L('deskSubtitle')}</p>
+          <Info>{L('deskSubtitle')}</Info>
         </div>
         <Refresh />
       </div>
-      <nav className="sd-tabs" aria-label="Shopify desk">
-        {tabs.map(([key, label, count, , due]) => (
-          <NavLink key={key} to={`/orders/shopify-desk/${key}`} className={({ isActive }) => (isActive ? 'on' : '')}>
-            {label}
-            {count ? <span className={`sd-count ${due ? 'hot' : ''}`} title={due ? `${due} due now` : ''}>{count}</span> : null}
-          </NavLink>
-        ))}
-      </nav>
       <Routes>
         {/* old bookmarks to the four pages that moved to the sidebar */}
         <Route path="overview" element={<Navigate to="/orders/desk-overview" replace />} />
