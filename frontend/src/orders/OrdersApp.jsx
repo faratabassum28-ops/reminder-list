@@ -11,10 +11,16 @@ import { StaffProvider, useStaff } from "./staff.jsx";
 import { FilterProvider } from "./filters.jsx";
 import { isAdmin, rolesOf, ROLE_LABEL } from "./flowUi.js";
 import { deskHome } from "./pages/desk/deskHome.js";
+import { LabelsProvider } from "./pages/desk/shared.jsx";
 import "./orders.css";
 
 const Overview = lazyRetry(() => import("./pages/Overview.jsx"));
 const ShopifyDesk = lazyRetry(() => import("./pages/desk/ShopifyDesk.jsx"));
+// The four Shopify desk report pages now live in the sidebar, under "Shopify desk".
+const DeskOverview = lazyRetry(() => import("./pages/desk/DeskOverview.jsx"));
+const OrderFunnel = lazyRetry(() => import("./pages/desk/OrderFunnel.jsx"));
+const DeskOrders = lazyRetry(() => import("./pages/desk/DeskOrders.jsx"));
+const OrderAnalysis = lazyRetry(() => import("./pages/desk/OrderAnalysis.jsx"));
 const TeamDashboard = lazyRetry(() => import("./pages/TeamDashboard.jsx"));
 const NdrPage = lazyRetry(() => import("./pages/courier/NdrPage.jsx"));
 const RtoPage = lazyRetry(() => import("./pages/courier/RtoPage.jsx"));
@@ -31,6 +37,10 @@ const O = "/orders";
 const NAV = [
   ["", "Overview", "overview"],
   ["/shopify-desk", "Shopify desk", "desk"],
+  ["/desk-overview", "Desk overview", "deskOverview", "sub"],
+  ["/order-funnel", "Order funnel", "deskFunnel", "sub"],
+  ["/shopify-orders", "Shopify orders", "deskOrders", "sub"],
+  ["/order-analysis", "Order analysis", "deskAnalysis", "sub"],
   ["/ndr", "Non-Delivery Report (NDR)", "ndr", "sub"],
   ["/rto", "RTO & Returns", "rto", "sub"],
   ["/weight-discrepancy", "Weight Discrepancy", "weight", "sub"],
@@ -45,9 +55,11 @@ const NAV = [
 
 // Which pages each team may open. Admin sees all of NAV; the others get exactly these (the server enforces the same rules).
 const ROLE_PAGES = {
-  confirmation: ["overview", "desk", "ndr", "rto"],
-  packing: ["overview", "desk", "ndr", "rto", "weight"],
+  confirmation: ["overview", "desk", "deskOrders", "deskAnalysis", "ndr", "rto"],
+  packing: ["overview", "desk", "deskOrders", "deskAnalysis", "ndr", "rto", "weight"],
 };
+// These pages read the desk's own labels, so each one is wrapped in the same provider the desk uses.
+const Desk = ({ title, children }) => <LabelsProvider><div className="sd"><div className="sd-top"><h1>{title}</h1></div><div className="sd-body">{children}</div></div></LabelsProvider>;
 const pagesFor = (user) => (isAdmin(user) ? null : [...new Set(["overview", ...rolesOf(user).flatMap((r) => ROLE_PAGES[r] || [])])]);
 
 // Small live counts next to the two desks: what is waiting, and what is overdue.
@@ -186,6 +198,10 @@ function Shell({ user }) {
                 <Route path="/campaigns" element={guard("campaigns", <Campaigns />)} />
                 <Route path="/reasons" element={guard("reasons", <Reasons />)} />
                 <Route path="/shopify-desk/*" element={guard("desk", <ShopifyDesk />)} />
+                <Route path="/desk-overview" element={guard("deskOverview", <Desk title="Desk overview"><DeskOverview /></Desk>)} />
+                <Route path="/order-funnel" element={guard("deskFunnel", <Desk title="Order funnel"><OrderFunnel /></Desk>)} />
+                <Route path="/shopify-orders" element={guard("deskOrders", <Desk title="Shopify orders"><DeskOrders /></Desk>)} />
+                <Route path="/order-analysis" element={guard("deskAnalysis", <Desk title="Order analysis"><OrderAnalysis /></Desk>)} />
                 <Route path="/ndr" element={guard("ndr", <NdrPage />)} />
                 <Route path="/rto" element={guard("rto", <RtoPage />)} />
                 <Route path="/weight-discrepancy" element={guard("weight", <WeightPage />)} />

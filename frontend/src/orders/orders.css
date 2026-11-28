@@ -953,3 +953,99 @@
 .oa-scope .ship-chip.awb_ready {border-color: color-mix(in srgb, var(--good) 45%, var(--line));}
 .oa-scope .ship-chip.waiting {border-color: color-mix(in srgb, var(--warn) 50%, var(--line));}
 .oa-scope .ship-chip.cancelled, .oa-scope .ship-chip.not_found {border-color: color-mix(in srgb, var(--bad) 45%, var(--line));}
+
+/* ================= Dispatch queue: one step at a time, big and plain ================= */
+/* Every service colour comes from --pc (set inline from providers.jsx), so a new service needs no new CSS. */
+.oa-scope .prov-tag {background: color-mix(in srgb, var(--pc, #5b6770) 14%, var(--surface)); color: var(--pc-ink, var(--ink-2)); border-color: color-mix(in srgb, var(--pc, #5b6770) 38%, transparent);}
+.oa-scope[data-oa-theme="dark"] .prov-tag {color: color-mix(in srgb, var(--pc, #9aa5ad) 55%, #fff);}
+.oa-scope .dq-card[class*="prov-"] {border-top: 4px solid var(--pc, var(--ink-3)); background: color-mix(in srgb, var(--surface) 93%, var(--pc, #5b6770) 7%);}
+.oa-scope .dq-dot {display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--pc, var(--ink-3)); margin-right: 8px; vertical-align: -1px;}
+
+/* the numbered steps across the top */
+.oa-scope .dq-steps {display: flex; align-items: stretch; gap: 8px; margin: 0 0 16px; flex-wrap: wrap;}
+.oa-scope .dq-step {flex: 1 1 220px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; min-width: 0;}
+.oa-scope .dq-step:hover {border-color: var(--ink-3);}
+.oa-scope .dq-step.on {border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 2px 10px rgba(0,0,0,.08);}
+.oa-scope .dq-num {flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; font-weight: 800; background: var(--line-2); color: var(--ink-2);}
+.oa-scope .dq-step.on .dq-num {background: var(--accent); color: #fff;}
+.oa-scope .dq-steptext {display: grid; gap: 1px; min-width: 0; flex: 1 1 auto;}
+.oa-scope .dq-steptext b {font-size: 16px; letter-spacing: -.01em;}
+.oa-scope .dq-steptext small {color: var(--ink-3); line-height: 1.3;}
+.oa-scope .dq-arrow {align-self: center; color: var(--ink-3); font-size: 18px;}
+
+/* the open step */
+.oa-scope .dq-stage {display: grid; gap: 14px; min-width: 0;}
+.oa-scope .dq-stagehead {display: grid; gap: 8px; padding: 14px; border-radius: 14px; background: var(--line-2); border-left: 6px solid var(--ink-3);}
+.oa-scope .dq-stage.slip .dq-stagehead {border-left-color: var(--fu1);}
+.oa-scope .dq-stage.packed .dq-stagehead {border-left-color: var(--pend);}
+.oa-scope .dq-stage.handover .dq-stagehead {border-left-color: var(--disp);}
+.oa-scope .dq-stagehead .dq-title {flex-wrap: wrap;}
+.oa-scope .dq-guide {margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink);}
+.oa-scope .dq-grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; min-width: 0; align-items: start;}
+.oa-scope .dq-boards {display: grid; gap: 16px; min-width: 0;}
+.oa-scope .dq-filterlabel {font-size: 13px; font-weight: 700; color: var(--ink-2);}
+
+/* service tabs */
+.oa-scope .dq-ptabs {display: flex; flex-wrap: wrap; align-items: center; gap: 8px;}
+.oa-scope .dq-ptab {display: inline-flex; align-items: center; border: 2px solid var(--line); background: var(--surface); border-radius: 99px; padding: 7px 16px; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink-2); cursor: pointer;}
+.oa-scope .dq-ptab b {margin-left: 8px; font-weight: 800; color: var(--ink);}
+.oa-scope .dq-ptab:hover {border-color: var(--ink-3);}
+.oa-scope .dq-ptab.on {background: var(--ink-solid, #1d2428); border-color: var(--ink-solid, #1d2428); color: #fff;}
+.oa-scope .dq-ptab.on b {color: #fff;}
+.oa-scope .dq-ptab[style] .dq-dot {margin-right: 8px;}
+
+/* one service's block */
+.oa-scope .dq-pboard {display: grid; gap: 12px; min-width: 0; padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); border-top: 6px solid var(--pc, var(--ink-3));}
+.oa-scope .dq-pboard-head {display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;}
+.oa-scope .dq-pboard-head h3 {margin: 0; font-size: 20px; letter-spacing: -.01em; color: var(--pc-ink, var(--ink));}
+.oa-scope[data-oa-theme="dark"] .dq-pboard-head h3 {color: color-mix(in srgb, var(--pc, #9aa5ad) 55%, #fff);}
+.oa-scope .dq-filterrow {display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;}
+.oa-scope .ship-chip.zero {opacity: .55;}
+.oa-scope .ship-chip.ready {border-color: color-mix(in srgb, var(--good) 45%, var(--line));}
+.oa-scope .ship-chip.noawb {border-color: color-mix(in srgb, var(--warn) 50%, var(--line));}
+.oa-scope .ship-chip.problem {border-color: color-mix(in srgb, var(--bad) 45%, var(--line));}
+.oa-scope .ship-bar .ship-check {margin-left: auto;}
+
+/* DONE that is not ready yet */
+.oa-scope .dq-done.locked:disabled {background: var(--line-2); color: var(--ink-3); border: 1px dashed var(--ink-3); opacity: 1; cursor: not-allowed;}
+
+/* waiting / working indicators */
+.oa-scope .dq-spin {display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--ink-3) 40%, transparent); border-top-color: var(--accent); animation: dq-rot .8s linear infinite; vertical-align: -2px;}
+@keyframes dq-rot {to {transform: rotate(360deg);}}
+@media (prefers-reduced-motion: reduce) {.oa-scope .dq-spin {animation-duration: 3s;}}
+.oa-scope .dq-progress {list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 8px;}
+.oa-scope .dq-progress li {display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: var(--line-2); line-height: 1.4;}
+.oa-scope .dq-progress li i {flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 800; background: var(--surface);}
+.oa-scope .dq-progress li.ok {background: color-mix(in srgb, var(--good) 12%, var(--surface));}
+.oa-scope .dq-progress li.ok i {background: var(--good); color: #fff;}
+.oa-scope .dq-progress li.wait {background: color-mix(in srgb, var(--warn) 14%, var(--surface));}
+
+/* handover: STEP 1 and STEP 2 side by side */
+.oa-scope .dq-two {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start;}
+.oa-scope .dq-hstep {display: grid; gap: 12px; min-width: 0; padding: 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--line-2);}
+.oa-scope .dq-hstep.todo {border-color: var(--pc, var(--accent)); background: color-mix(in srgb, var(--pc, #5b6770) 6%, var(--surface));}
+.oa-scope .dq-hstep.idle {opacity: .9;}
+.oa-scope .dq-hhead {display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;}
+.oa-scope .dq-hhead > div {flex: 1 1 200px; min-width: 0;}
+.oa-scope .dq-hhead h4 {margin: 0; font-size: 17px; letter-spacing: -.01em;}
+.oa-scope .dq-hhead p {margin: 2px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.4;}
+.oa-scope .dq-hhead .btn {flex: 0 0 auto;}
+.oa-scope .dq-big {flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; font-weight: 800; color: #fff; background: var(--pc, var(--accent));}
+.oa-scope .dq-hstep .dq-grid {grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));}
+.oa-scope .manifest-group.selected {outline: 3px solid var(--pc, var(--accent)); outline-offset: -1px;}
+.oa-scope .dq-selectlabel {cursor: pointer; display: flex; align-items: center; gap: 8px;}
+.oa-scope .dq-direct {border-top: 1px dashed var(--line); padding-top: 8px;}
+.oa-scope .dq-direct summary {cursor: pointer; font-weight: 600; color: var(--ink-2);}
+.oa-scope .dq-tick {display: flex; align-items: center; gap: 8px; cursor: pointer;}
+
+@media (max-width: 1100px) {
+  .oa-scope .dq-two {grid-template-columns: 1fr;}
+}
+@media (max-width: 700px) {
+  .oa-scope .dq-arrow {display: none;}
+  .oa-scope .dq-step {flex-basis: 100%; padding: 10px 12px;}
+  .oa-scope .dq-grid, .oa-scope .dq-hstep .dq-grid {grid-template-columns: 1fr;}
+  .oa-scope .dq-ptab {padding: 6px 12px;}
+  .oa-scope .dq-hhead .btn {width: 100%;}
+  .oa-scope .ship-bar .ship-check {margin-left: 0; width: 100%;}
+}
