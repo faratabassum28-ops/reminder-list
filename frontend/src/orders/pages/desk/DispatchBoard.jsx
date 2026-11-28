@@ -7,6 +7,16 @@ import { duration, fmtWhen, useAutoRefresh } from '../../flowUi.js';
 import { inr } from '../../format.js';
 import { can, useStaff } from '../../staff.jsx';
 import { PROVIDERS, ProviderBadge, providerLabel } from '../../providers.jsx';
+
+// What the courier's refusal means and what to do about it. The courier decides, not this app: a manifest only works on an order
+// that is ready for pickup at the courier.
+function manifestHint(prov, message) {
+  const m = String(message || '').toLowerCase();
+  if (prov === 'shipway' && /only for processed|processed orders/.test(m)) return 'In Shipway this order is not "Processed" yet. Process it there first (assign the courier and generate the AWB / label), then create the manifest again.';
+  if (prov === 'shiprocket' && /manifest not generated/.test(m)) return 'In Shiprocket the order needs an AWB and a scheduled pickup before a manifest can be made. Generate the pickup in Shiprocket, then try again (an order already on a manifest is refused too).';
+  if (/not serviceable/.test(m)) return 'The courier cannot pick up from or deliver to this pincode. Change the courier in the courier\'s dashboard.';
+  return '';
+}
 import { AssigneeRow, Empty, MultiPhotoField, OrderDrawer, PayTag, WhoFilter, Workload, notifyDesk, peopleFor, useAssign, useClock, useDebounced, useLabels, useTeam } from './shared.jsx';
 
 // The three columns of the Dispatch queue, left to right. "done" is the button label on the card.
@@ -90,7 +100,7 @@ function Card({ o, col, title, now, offset, canAct, busy, picked, onPick, onDone
       <div className="sd-who"><b>{o.name || 'No name'}</b>{o.city ? <span className="muted"> · {o.city}</span> : null}</div>
       <div className="sd-line"><span className="sd-amt">{inr(o.total)}</span><span className="sd-items" title={o.items}>{o.items || 'Items not loaded'}</span></div>
       {col.key !== 'slip' && (awb ? <div className="sd-foot"><span>AWB <b>{awb}</b>{courier ? ` · ${courier}` : ''}</span></div> : col.key === 'packed' ? <ShipLine o={o} prov={prov} canAct={canAct} busy={busy} onCancel={onCancel} onSwitch={onSwitch} /> : <div className="sd-foot warn"><span>AWB not in {providerLabel(prov || 'shipway')} yet</span></div>)}
-      {col.key === 'handover' && o.dq.manifestError && <div className="sd-foot warn" role="alert"><span>{providerLabel(prov || 'shipway')} rejected it for the manifest: <b>{o.dq.manifestError.message}</b></span></div>}
+      {col.key === 'handover' && o.dq.manifestError && <div className="sd-foot warn" role="alert"><span>{providerLabel(prov || 'shipway')} rejected it for the manifest: <b>{o.dq.manifestError.message}</b>{manifestHint(prov || 'shipway', o.dq.manifestError.message) && <span className="muted"> — {manifestHint(prov || 'shipway', o.dq.manifestError.message)}</span>}</span></div>}
       {o.collect > 0 && Math.round(o.collect) !== Math.round(o.total || 0) && <div className="sd-foot"><span className="sd-collect-tag">Collect {inr(o.collect)}</span></div>}
       {(assign || canAct) && (
         <div className="dq-row">
