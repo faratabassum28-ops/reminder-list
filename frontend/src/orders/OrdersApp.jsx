@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState } from "react";
-import { Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from "react-router-dom";
 import LoadingScreen from "../components/LoadingScreen.jsx";
 import PageLoader from "../components/PageLoader.jsx";
 import RouteBoundary from "../components/RouteBoundary.jsx";
@@ -36,14 +36,7 @@ const O = "/orders";
 // Third item 'sub' = an indented entry that lives under the item above it.
 const NAV = [
   ["", "Overview", "overview"],
-  ["/shopify-desk", "Shopify desk", "desk", "head"],
-  ["/shopify-desk/confirm", "tabConfirm", "deskConfirm", "sub"],
-  ["/shopify-desk/pending", "tabPending", "deskPending", "sub"],
-  ["/shopify-desk/dispatch", "tabDispatch", "deskDispatch", "sub"],
-  ["/shopify-desk/transit", "tabTransit", "deskTransit", "sub"],
-  ["/shopify-desk/partial", "tabPartial", "deskPartial", "sub"],
-  ["/shopify-desk/cancelled", "tabCancelled", "deskCancelled", "sub"],
-  ["/shopify-desk/settings", "tabSettings", "deskSettings", "sub"],
+  ["/shopify-desk", "Shopify desk", "desk"],
   ["/desk-overview", "Desk overview", "deskOverview", "sub"],
   ["/order-funnel", "Order funnel", "deskFunnel", "sub"],
   ["/shopify-orders", "Shopify orders", "deskOrders", "sub"],
@@ -95,6 +88,11 @@ function Badge({ keyName, badges }) {
   if (!badges) return null;
   const sh = badges.shop;
   if (sh) {
+    if (keyName === "desk") {
+      const open = (sh.confirm ? sh.confirm.total : 0) + (sh.pending ? sh.pending.total : 0) + (sh.dispatch || 0);
+      const hot = (sh.confirm ? sh.confirm.due : 0) + (sh.pending ? sh.pending.due : 0) + (sh.dispatchSteps ? sh.dispatchSteps.overdue : 0);
+      return open > 0 ? <span className={`nav-badge ${hot > 0 ? "bad" : ""}`} title={hot > 0 ? `${hot} due now` : `${open} open`}>{hot > 0 ? hot : open}</span> : null;
+    }
     const pill = (open, hot, hotTitle) => (open > 0 ? <span className={`nav-badge ${hot > 0 ? "bad" : ""}`} title={hot > 0 ? `${hot} ${hotTitle}` : `${open} open`}>{hot > 0 ? hot : open}</span> : null);
     if (keyName === "deskConfirm" && sh.confirm) return pill(sh.confirm.total, sh.confirm.due, "calls due now");
     if (keyName === "deskPending" && sh.pending) return pill(sh.pending.total, sh.pending.due, "calls due now");
@@ -150,6 +148,7 @@ function NavLabel({ text }) { const { L } = useLabels(); return <>{/^tab[A-Z]/.t
 function Shell({ user }) {
   const { logout, hasReminder, hasWorkshop, hasTickets, hasCertificates, hasEmi, hasLeadFms, hasSalesFms } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   // The menu folds away as soon as you pick something, to give the page the whole screen; the ☰ button brings it back.
   const [collapsed, setCollapsed] = useState(false);
   // Order Analytics opens in its LIGHT look. (Its own switch; the hub's theme does not change it.)
@@ -188,7 +187,7 @@ function Shell({ user }) {
                   key={key}
                   to={to}
                   end={key === "overview"}
-                  className={({ isActive }) => `${kind === "sub" ? "sub " : ""}${isActive ? "active" : ""}`}
+                  className={({ isActive }) => `${kind === "sub" ? "sub " : ""}${isActive || (key === "desk" && pathname.startsWith(O + "/shopify-desk")) ? "active" : ""}`}
                   onClick={() => setCollapsed(true)}
                 >
                   <span><NavLabel text={label} /></span><Badge keyName={key} badges={badges} />
