@@ -167,7 +167,7 @@ function HeldCard({ o, now, offset, canAct, busy, onResume, onCancel, onOpen }) 
     </article>
   );
 }
-const STEP_KEYS = { slip: 'stepSlip', manifest: 'stepManifest', packed: 'stepPacked', handover: 'stepHandover' };
+export const STEP_KEYS = { slip: 'stepSlip', manifest: 'stepManifest', packed: 'stepPacked', handover: 'stepHandover' };
 
 // ---------------------------------------------------------------- hold and cancel forms
 function HoldSheet({ order: o, show, onClose, onDone }) {
@@ -187,7 +187,7 @@ function HoldSheet({ order: o, show, onClose, onDone }) {
   );
 }
 
-function ResumeSheet({ order: o, show, onClose, onDone }) {
+export function ResumeSheet({ order: o, show, onClose, onDone }) {
   const [note, setNote] = useState(''); const [busy, setBusy] = useState(false);
   const submit = async () => {
     setBusy(true);
@@ -204,7 +204,7 @@ function ResumeSheet({ order: o, show, onClose, onDone }) {
   );
 }
 
-function CancelSheet({ order: o, reasons, show, onClose, onDone }) {
+export function CancelSheet({ order: o, reasons, show, onClose, onDone }) {
   const [pick, setPick] = useState(''); const [typed, setTyped] = useState(''); const [note, setNote] = useState(''); const [busy, setBusy] = useState(false);
   const other = pick === 'Other';
   const reason = other ? typed.trim() : pick;
@@ -715,7 +715,7 @@ export default function DispatchBoard() {
       {data && <Stepper steps={steps} stage={stage} setStage={setStage} />}
       <div className="filters"><input type="search" placeholder="Search order number, name or phone" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" /><span className="grow" />
         <WhoFilter value={who} onChange={setWho} people={isAdmin ? people : []} show={!!data && (Object.values(data.assign.modes).some((m) => m !== 'off') || !!who)} />
-        {data && <span className="muted">{data.shown} {data.shown === 1 ? 'order' : 'orders'}{c && c.overdue ? ` · ${c.overdue} overdue` : ''}{held.length ? ` · ${held.length} on hold` : ''}{data.collectTotal ? ` · ${inr(data.collectTotal)} to collect on delivery` : ''}</span>}</div>
+        {data && held.length > 0 && <Link className="muted" to="/orders/shopify-desk/hold">{held.length} on hold →</Link>}{data && <span className="muted">{data.shown} {data.shown === 1 ? 'order' : 'orders'}{c && c.overdue ? ` · ${c.overdue} overdue` : ''}{data.collectTotal ? ` · ${inr(data.collectTotal)} to collect on delivery` : ''}</span>}</div>
       <Loading error={error} loading={loading && !data}>
         {data && stage === 'slip' && (
           <div className="dq-stage slip">
@@ -733,16 +733,6 @@ export default function DispatchBoard() {
             })()}
             <ProviderTabs view={view} setView={setView} counts={countsOf(stageList[stage])} />
             <div className="dq-boards">{shownProviders.map(stage === 'manifest' ? renderManifest : stage === 'packed' ? renderPacked : renderHandover)}</div>
-          </div>
-        )}
-        {data && held.length > 0 && (
-          <div className="dq-col hold dq-holdbox">
-            <div className="dq-colhead">
-              <div className="dq-title"><h2>On hold</h2><span className="sd-count">{held.length}</span><Info label="About on hold">Paused orders. Their deadline is stopped. Resume to send one back to its step, or cancel it. Every hold and cancel needs a note.</Info></div>
-            </div>
-            <div className="dq-cards dq-holdcards">
-              {held.filter((o) => o.dq && o.dq.hold).map((o) => <HeldCard key={o.orderId} o={o} now={now} offset={offset} canAct={actor} busy={busyId === o.orderId} onResume={setResuming} onCancel={setCancelling} onOpen={setOpen} />)}
-            </div>
           </div>
         )}
       </Loading>

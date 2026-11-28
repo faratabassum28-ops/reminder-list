@@ -10,6 +10,7 @@ import { ConfirmQueue, PendingQueue } from './DeskQueue.jsx';
 import { PartialPaid, CancelledOrders } from './DeskLists.jsx';
 import DispatchBoard from './DispatchBoard.jsx';
 import TransitOrders from './TransitOrders.jsx';
+import HoldOrders from './HoldOrders.jsx';
 import DeskSettings from './DeskSettings.jsx';
 
 // Every desk page (Confirm, Pending, Dispatch, In transit, Partial, Cancelled, Settings) is a tab inside the Shopify desk page. The sidebar has one "Shopify desk" link.
@@ -21,6 +22,7 @@ function tabsFor(user, c, L) {
     ['confirm', L('tabConfirm'), c && n(c.confirm.total), ['admin', 'confirmation'], c && c.confirm.due],
     ['pending', L('tabPending'), c && n(c.pending.total), ['admin', 'confirmation'], c && c.pending.due],
     ['dispatch', L('tabDispatch'), c && n(c.dispatch), ['admin', 'packing'], c && c.dispatchSteps && c.dispatchSteps.overdue],
+    ['hold', 'On hold', c && c.dispatchSteps && n(c.dispatchSteps.hold), ['admin', 'packing']],
     ['transit', L('tabTransit'), null, ALL],
     ['partial', L('tabPartial'), c && n(c.partial), ['admin', 'confirmation']],
     ['cancelled', L('tabCancelled'), c && n(c.cancelled), ['admin', 'confirmation']],
@@ -77,6 +79,7 @@ function DeskInner() {
         <Route path="confirm" element={guard('confirm', <ConfirmQueue />)} />
         <Route path="pending" element={guard('pending', <PendingQueue />)} />
         <Route path="dispatch" element={guard('dispatch', <DispatchBoard />)} />
+        <Route path="hold" element={guard('hold', <HoldOrders />)} />
         <Route path="transit" element={guard('transit', <TransitOrders />)} />
         <Route path="partial" element={guard('partial', <PartialPaid />)} />
         <Route path="cancelled" element={guard('cancelled', <CancelledOrders />)} />
