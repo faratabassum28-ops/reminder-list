@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useToast } from '../../deskUi.jsx';
 import { useStaff } from '../../staff.jsx';
@@ -12,7 +12,7 @@ import DispatchBoard from './DispatchBoard.jsx';
 import TransitOrders from './TransitOrders.jsx';
 import DeskSettings from './DeskSettings.jsx';
 
-// Every desk page (Confirm, Pending, Dispatch, In transit, Partial, Cancelled, Settings) now lives in the sidebar under "Shopify desk", so no tab bar takes up room here.
+// Every desk page (Confirm, Pending, Dispatch, In transit, Partial, Cancelled, Settings) is a tab inside the Shopify desk page. The sidebar has one "Shopify desk" link.
 // This list says who may open which page; the sidebar and the routes below both follow it.
 function tabsFor(user, c, L) {
   const n = (v) => (v ? v : null);
@@ -61,6 +61,13 @@ function DeskInner() {
         </div>
         <Refresh />
       </div>
+      <nav className="sd-tabs" aria-label="Shopify desk pages">
+        {tabs.map(([key, label, count, , hot]) => (
+          <NavLink key={key} to={`/orders/shopify-desk/${key}`} className={({ isActive }) => (isActive ? 'on' : '')}>
+            {label}{count ? <span className={`sd-count ${hot ? 'hot' : ''}`} title={hot ? `${hot} due now` : `${count} open`}>{hot || count}</span> : null}
+          </NavLink>
+        ))}
+      </nav>
       <Routes>
         {/* old bookmarks to the four pages that moved to the sidebar */}
         <Route path="overview" element={<Navigate to="/orders/desk-overview" replace />} />

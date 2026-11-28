@@ -1059,9 +1059,8 @@
 .oa-scope .info-pop b {font-weight: 700;}
 
 /* ---- Dispatch: cards go DOWN the page, one under another (never side by side) ---- */
-.oa-scope .dq-grid {grid-template-columns: minmax(0, 1fr) !important;}
+.oa-scope .dq-grid, .oa-scope .dq-hstep .dq-grid {grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important; gap: 8px;}
 .oa-scope .dq-two {grid-template-columns: minmax(0, 1fr) !important;}
-.oa-scope .dq-hstep .dq-grid {grid-template-columns: minmax(0, 1fr) !important;}
 .oa-scope .dq-stage.manifest .dq-stagehead {border-left-color: var(--fu2);}
 .oa-scope .dq-stagehead.compact {padding: 10px 12px; gap: 4px;}
 .oa-scope .dq-stagehead .dq-title {display: flex; align-items: center; gap: 8px;}
@@ -1075,3 +1074,17 @@
 /* ---- Sidebar: the desk's own pages sit under "Shopify desk", so the place you are in is always the one lit ---- */
 .oa-scope .sd-titleline {display: flex; align-items: center; gap: 10px;}
 .oa-scope .sd .sd-top {padding-top: 14px;}
+
+/* ---- Dispatch cards: compact ---- */
+.oa-scope .dq-grid .dq-card {padding: 7px 9px; gap: 3px; font-size: 12.5px; border-left-width: 3px; border-radius: 10px;}
+.oa-scope .dq-grid .dq-card.prov-shipway, .oa-scope .dq-grid .dq-card.prov-shiprocket {border-top-width: 3px;}
+.oa-scope .dq-grid .dq-card .sd-who {overflow: hidden; text-overflow: ellipsis; font-size: 12.5px;}
+.oa-scope .dq-grid .dq-card .sd-items {font-size: 11.5px;}
+.oa-scope .dq-grid .dq-card .ship-line {padding: 4px 7px; font-size: 11.5px; gap: 4px 6px; border-radius: 8px;}
+.oa-scope .dq-grid .dq-card .ship-line > span {flex: 1 1 100px;}
+.oa-scope .dq-grid .dq-card .ship-line .ship-act {padding: 2px 8px; font-size: 11px;}
+.oa-scope .dq-grid .dq-card .dq-actions {padding-top: 4px; margin-top: 2px; gap: 4px;}
+.oa-scope .dq-grid .dq-card .dq-actions .btn {min-height: 24px; padding: 2px 4px; font-size: 11px;}
+.oa-scope .dq-grid .dq-card .dq-row .dq-done {min-height: 26px; padding: 2px 14px; font-size: 11px;}
+.oa-scope .dq-pboard {padding: 10px; gap: 8px;}
+.oa-scope .sd-tabs {padding-left: 28px;}
