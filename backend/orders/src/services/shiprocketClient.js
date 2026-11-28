@@ -177,4 +177,12 @@ async function createManifest({ shipmentIds }) {
   return { status: r.status, data: r.data, raw: r.raw };
 }
 
-module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, trackByAwb, createManifest, recentOrders, diagnoseOrder, simple, _reset: () => { forgetToken(); recentCache = { at: 0, pages: 0, list: [] }; } };
+// Ask Shiprocket to schedule the pickup for these shipments. Shiprocket only makes a manifest for shipments whose pickup is already
+// scheduled, so this is the step that usually has to come first. Not retried automatically (a second call could book a second pickup).
+async function generatePickup({ shipmentIds }) {
+  if (isMock()) return { status: 200, data: { pickup_status: 1, response: { pickup_scheduled_date: new Date().toISOString().slice(0, 10), data: 'Pickup Scheduled (demo)' } } };
+  const r = await call('POST', 'courier/generate/pickup', { body: { shipment_id: shipmentIds.map(Number) }, once: true });
+  return { status: r.status, data: r.data, raw: r.raw };
+}
+
+module.exports = { ShiprocketError, isConfigured, isMock, authenticate, getOrderShipment, trackByAwb, createManifest, generatePickup, recentOrders, diagnoseOrder, simple, _reset: () => { forgetToken(); recentCache = { at: 0, pages: 0, list: [] }; } };
