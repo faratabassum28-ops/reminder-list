@@ -6,25 +6,17 @@ import { useStaff } from '../../staff.jsx';
 import { hasRole, isAdmin, rolesOf } from '../../flowUi.js';
 import { deskHome } from './deskHome.js';
 import { LabelsProvider, notifyDesk, useDeskCounts, useLabels } from './shared.jsx';
-import DeskOverview from './DeskOverview.jsx';
-import DeskOrders from './DeskOrders.jsx';
-import OrderAnalysis from './OrderAnalysis.jsx';
-import OrderFunnel from './OrderFunnel.jsx';
 import { ConfirmQueue, PendingQueue } from './DeskQueue.jsx';
 import { PartialPaid, CancelledOrders } from './DeskLists.jsx';
 import DispatchBoard from './DispatchBoard.jsx';
 import TransitOrders from './TransitOrders.jsx';
 import DeskSettings from './DeskSettings.jsx';
 
-// Tabs, in the order the team works an order: new orders, confirm calls, pending calls, dispatch (slip, packed, handover), in transit, then the side lists.
+// Overview, Order funnel, Shopify orders and Order analysis moved to the sidebar. Tabs, in the order the team works an order: confirm calls, pending calls, dispatch (slip, packed, handover), in transit, then the side lists.
 function tabsFor(user, c, L) {
   const n = (v) => (v ? v : null);
   const ALL = ['admin', 'confirmation', 'packing'];
   const all = [
-    ['overview', L('tabOverview'), null, ['admin']],
-    ['funnel', L('tabFunnel'), null, ['admin']],
-    ['orders', L('tabOrders'), null, ALL],
-    ['analysis', L('tabAnalysis'), null, ALL],
     ['confirm', L('tabConfirm'), c && n(c.confirm.total), ['admin', 'confirmation'], c && c.confirm.due],
     ['pending', L('tabPending'), c && n(c.pending.total), ['admin', 'confirmation'], c && c.pending.due],
     ['dispatch', L('tabDispatch'), c && n(c.dispatch), ['admin', 'packing'], c && c.dispatchSteps && c.dispatchSteps.overdue],
@@ -77,10 +69,11 @@ function DeskInner() {
         ))}
       </nav>
       <Routes>
-        <Route path="overview" element={guard('overview', <DeskOverview />)} />
-        <Route path="funnel" element={guard('funnel', <OrderFunnel />)} />
-        <Route path="orders" element={<DeskOrders />} />
-        <Route path="analysis" element={<OrderAnalysis />} />
+        {/* old bookmarks to the four pages that moved to the sidebar */}
+        <Route path="overview" element={<Navigate to="/orders/desk-overview" replace />} />
+        <Route path="funnel" element={<Navigate to="/orders/order-funnel" replace />} />
+        <Route path="orders" element={<Navigate to="/orders/shopify-orders" replace />} />
+        <Route path="analysis" element={<Navigate to="/orders/order-analysis" replace />} />
         <Route path="confirm" element={guard('confirm', <ConfirmQueue />)} />
         <Route path="pending" element={guard('pending', <PendingQueue />)} />
         <Route path="dispatch" element={guard('dispatch', <DispatchBoard />)} />
