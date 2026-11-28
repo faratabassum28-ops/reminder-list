@@ -115,6 +115,7 @@ router.post('/dispatch/:orderId/awb', need('packing'), wrap(async (req, res) => 
 router.post('/dispatch/check', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchCheck({ provider: req.body && req.body.provider }))));
 router.post('/dispatch/:orderId/provider', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchProvider(who(req), orderIdOf(req), { provider: req.body && req.body.provider }))));
 router.post('/dispatch/:orderId/hold', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchHold(who(req), orderIdOf(req), { note: req.body && req.body.note }))));
+router.post('/dispatch/:orderId/hold-followup', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchHoldFollowUp(who(req), orderIdOf(req), { note: req.body && req.body.note }))));
 router.post('/dispatch/:orderId/resume', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchResume(who(req), orderIdOf(req), { note: req.body && req.body.note }))));
 router.post('/dispatch/:orderId/cancel', need('packing'), wrap(async (req, res) => res.json(await svc.dispatchCancel(who(req), orderIdOf(req), { reason: req.body && req.body.reason, note: req.body && req.body.note }))));
 router.post('/dispatch/:orderId/packed', need('packing'), takeFiles('photos', 'photo'), wrap(async (req, res) => {

@@ -578,6 +578,10 @@ async function dispatchHold(user, orderId, { note }) {
   const { doc } = await loadForAction(orderId, user);
   return brief(await applyTransition(doc, DP.holdOrder(doc, { note }, user), { assign: false }));
 }
+async function dispatchHoldFollowUp(user, orderId, { note } = {}) {
+  const { doc } = await loadForAction(orderId, user);
+  return brief(await applyTransition(doc, DP.holdFollowUp(doc, { note }, user), { assign: false }));
+}
 async function dispatchResume(user, orderId, { note } = {}) {
   const { doc } = await loadForAction(orderId, user);
   return brief(await applyTransition(doc, DP.resumeOrder(doc, { note }, user)));
@@ -1038,4 +1042,4 @@ function start() {
   }
 }
 
-module.exports = { keepAwb, staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchAwb, dispatchProvider, dispatchCheck, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };
+module.exports = { keepAwb, staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchHoldFollowUp, dispatchResume, dispatchCancel, dispatchSlip, dispatchAwb, dispatchProvider, dispatchCheck, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };

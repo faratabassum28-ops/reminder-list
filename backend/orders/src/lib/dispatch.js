@@ -295,8 +295,18 @@ function holdOrder(doc, input = {}, who = { id: 'system', name: 'System' }, now 
   if (isHeld(doc)) throw httpErr(409, `Order #${doc.orderId} is already on hold.`);
   const note = cleanNote(input.note, { label: 'note saying why the order is on hold' });
   const step = stepOf(doc);
-  const dq = { ...(doc.dq || {}), step, hold: { at: now, byName: who.name, byId: who.id, note, step } };
+  const dq = { ...(doc.dq || {}), step, hold: { at: now, byName: who.name, byId: who.id, note, step, fu: 1 } };
   return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'hold', label: `Put on hold at “${STEP_LABEL[step]}” · ${note}` }] };
+}
+
+// A held order is chased in two follow-up calls. Logging a call at FU1 moves the order to FU2; a call at FU2 stays in FU2 and just records it.
+function holdFollowUp(doc, input = {}, who = { id: 'system', name: 'System' }, now = new Date()) {
+  if (!isHeld(doc)) throw httpErr(409, `Order #${doc.orderId} is not on hold. Refresh to see its latest status.`);
+  const note = cleanNote(input.note, { required: false, label: 'note' });
+  const from = doc.dq.hold.fu === 2 ? 2 : 1;
+  const hold = { ...doc.dq.hold, fu: 2, fuAt: now, fuByName: who.name, fuNote: note || null, calls: (doc.dq.hold.calls || 0) + 1 };
+  const dq = { ...doc.dq, hold };
+  return { set: { dq }, entries: [{ ...base(doc, who, now), action: 'hold_followup', label: `Held order: follow-up ${from} call done${from === 1 ? ' · moved to FU2' : ''}${note ? ` · ${note}` : ''}` }] };
 }
 
 // The deadline restarts from the moment of resuming, so the time spent on hold never counts against the packing team.
@@ -330,5 +340,5 @@ module.exports = {
   STEPS, STEP_LABEL, MAX_HANDOVER_BATCH, MAX_PHOTOS, DEFAULT_DISPATCH_CONFIG, httpErr, idsOf,
   normaliseDispatchConfig, isWorkingDay, nextWorkingDay, dueFor, stepOf, stepStart, dueAt,
   manifestOf, manifestError, eligibleForManifest, sameCourier, manifestAssigned, manifestRejected, groupByManifest, manifestCouriers,
-  slipDone, awbSaved, awbOf, cleanCourier, cleanProvider, providerChanged, packedDone, handoverDone, holdOrder, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
+  slipDone, awbSaved, awbOf, cleanCourier, cleanProvider, providerChanged, packedDone, handoverDone, holdOrder, holdFollowUp, resumeOrder, cleanNote, isHeld, cleanAwb, stepCounts, timeLabel,
 };
