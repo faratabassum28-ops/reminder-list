@@ -203,53 +203,81 @@ test('names an admin set show up on the cards, while the stored follow-up name s
   assert.equal(c.fu, 'FU1'); assert.equal(c.fuShown, 'Call 1'); assert.equal(c.status, 'Confirm queue · Call 1');
 });
 
-// ---------------------------------------------------------------- packing: AWB and courier from Shipway, several photos
-const slipped = (orderId, extra = {}) => desk(orderId, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'packed', stepAt: T0, slip: { at: T0 } }, ...extra });
+// ---------------------------------------------------------------- the four steps: slip (AWB) -> manifest -> packed -> handover
+const slipped = (orderId, extra = {}) => desk(orderId, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'manifest', stepAt: T0, slip: { at: T0 } }, ...extra });
+const manifested = (orderId, extra = {}) => desk(orderId, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'packed', stepAt: T0, slip: { at: T0 }, awb: { awb: `AWB${orderId}2345`, courier: 'Delhivery' }, manifest: { id: 'MF-1', courier: 'Delhivery' } }, ...extra });
 const packer = { id: 'pk', name: 'Ravi', role: 'packing' };
 
-test('packing takes the AWB and courier from Shipway, ignores what the browser sent, and keeps every photo', async () => {
-  reset(); slipped(1);
-  models.ShipwayShipment.docs.push({ orderId: 1, found: true, awb: '1491051082340', carrier: 'Delhivery' });
-  await svc.dispatchPacked(packer, 1, { awb: 'TYPED99999', courier: 'Wrong', files: [photo, photo, photo] });
+test('Order packed needs only a tap: the AWB and manifest are already known, photos are optional and all kept', async () => {
+  reset(); manifested(1);
+  await svc.dispatchPacked(packer, 1, { files: [photo, photo, photo] });
   const p = get1(1).dq.packed;
-  assert.equal(p.awb, '1491051082340'); assert.equal(p.courier, 'Delhivery');
+  assert.equal(p.awb, 'AWB12345'); assert.equal(p.courier, 'Delhivery');
   assert.equal(p.photoIds.length, 3); assert.equal(p.photoId, p.photoIds[0]);
   assert.equal(models.DispatchProof.docs.length, 3);
   assert.equal(get1(1).dq.step, 'handover');
+  manifested(2);
+  await svc.dispatchPacked(packer, 2, { files: [] }); // no photo needed by default
+  assert.equal(get1(2).dq.step, 'handover');
 });
 
-test('packing needs at least one photo, refuses non-photos and more than ten, and stores nothing when it refuses', async () => {
-  reset(); slipped(1);
-  models.ShipwayShipment.docs.push({ orderId: 1, found: true, awb: 'AWB12345', carrier: 'Delhivery' });
-  await rejects(svc.dispatchPacked(packer, 1, { files: [] }), 400, /at least one photo/);
+test('packing refuses non-photos and more than ten, and stores nothing when it refuses', async () => {
+  reset(); manifested(1);
   await rejects(svc.dispatchPacked(packer, 1, { files: [photo, { buffer: Buffer.from('not a photo at all') }] }), 400, /must be a photo/);
   await rejects(svc.dispatchPacked(packer, 1, { files: Array.from({ length: 11 }, () => photo) }), 400, /at most 10/);
   assert.equal(models.DispatchProof.docs.length, 0); assert.equal(get1(1).dq.step, 'packed');
+  await svc.saveDispatchConfig({ stages: { packed: { requirePhoto: true } } });
+  await rejects(svc.dispatchPacked(packer, 1, { files: [] }), 400, /at least one photo/);
 });
 
-test('no AWB in Shipway yet: the typed one is used unless Settings turned that off', async () => {
+test('no AWB from the service yet: the packing team types the AWB and courier for that order, and the manifest step can use it', async () => {
   reset(); slipped(1);
-  await svc.dispatchPacked(packer, 1, { awb: 'MANUAL12345', courier: 'Xpress', files: [photo] });
-  assert.equal(get1(1).dq.packed.awb, 'MANUAL12345');
-  slipped(2);
-  await svc.saveDispatchConfig({ allowManualAwb: false });
-  await rejects(svc.dispatchPacked(packer, 2, { awb: 'MANUAL99999', files: [photo] }), 409, /Shipway has no AWB/);
-  assert.equal(get1(2).dq.step, 'packed');
+  await rejects(svc.dispatchAwb(packer, 1, { awb: 'AB', courier: 'Xpress' }), 400, /5 to 40/);
+  await rejects(svc.dispatchAwb(packer, 1, { awb: 'MANUAL12345', courier: '' }), 400, /courier/i);
+  await svc.dispatchAwb(packer, 1, { awb: 'manual 12345', courier: 'Xpress' });
+  const a = get1(1).dq.awb;
+  assert.equal(a.awb, 'MANUAL12345'); assert.equal(a.courier, 'Xpress'); assert.equal(a.source, 'manual');
+  assert.equal(get1(1).dq.step, 'manifest'); // typing the AWB does not skip the manifest
+  const b = await svc.dispatchBoard({ viewer: { id: 'adm', role: 'admin' } });
+  assert.deepEqual(b.handover.shipway.couriers.map((c) => [c.courier, c.count]), [['Xpress', 1]]);
+});
+
+test('the AWB can be typed in the same request that marks the slip done', async () => {
+  reset(); desk(1, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'slip', stepAt: T0 } });
+  await svc.dispatchSlip(packer, 1, { provider: 'shiprocket', awb: 'SR1234567', courier: 'Bluedart' });
+  const d = get1(1);
+  assert.equal(d.dq.step, 'manifest'); assert.equal(d.dq.provider.name, 'shiprocket'); assert.equal(d.dq.awb.awb, 'SR1234567'); assert.equal(d.dq.awb.courier, 'Bluedart');
+  desk(2, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'slip', stepAt: T0 } });
+  await rejects(svc.dispatchSlip(packer, 2, { provider: 'shipway', awb: 'SR1234567', courier: 'Bluedart' }), 409, /already on order #1/);
+  assert.equal(get1(2).dq.step, 'slip');
 });
 
 test('an AWB that is already on another order is refused', async () => {
   reset(); slipped(1); slipped(2);
-  models.ShipwayShipment.docs.push({ orderId: 1, found: true, awb: 'SAME12345', carrier: 'D' }, { orderId: 2, found: true, awb: 'SAME12345', carrier: 'D' });
-  await svc.dispatchPacked(packer, 1, { files: [photo] });
-  await rejects(svc.dispatchPacked(packer, 2, { files: [photo] }), 409, /already on order #1/);
-  assert.equal(models.DispatchProof.docs.length, 1); // the refused one stored nothing
+  await svc.dispatchAwb(packer, 1, { awb: 'SAME12345', courier: 'D' });
+  await rejects(svc.dispatchAwb(packer, 2, { awb: 'same12345', courier: 'D' }), 409, /already on order #1/);
+  assert.equal(get1(2).dq.awb, undefined);
 });
 
-test('the packing board suggests the Shipway AWB and courier', async () => {
+test('an AWB the service already gave is saved on the order by the board, so the manifest can be made without typing', async () => {
   reset(); slipped(1);
   models.ShipwayShipment.docs.push({ orderId: 1, found: true, awb: 'SHIP12345', carrier: 'Bluedart' });
   const b = await svc.dispatchBoard({ viewer: { id: 'adm', role: 'admin' } });
-  assert.equal(b.columns.packed[0].dq.suggestedAwb, 'SHIP12345'); assert.equal(b.columns.packed[0].dq.suggestedCourier, 'Bluedart');
+  assert.equal(b.columns.manifest.length, 1);
+  assert.equal(b.columns.manifest[0].dq.suggestedAwb, 'SHIP12345'); assert.equal(b.columns.manifest[0].dq.awb.awb, 'SHIP12345');
+  assert.equal(get1(1).dq.awb.awb, 'SHIP12345'); assert.equal(get1(1).dq.awb.source, 'provider');
+  assert.deepEqual(b.handover.shipway.couriers.map((c) => [c.courier, c.count]), [['Bluedart', 1]]);
+});
+
+test('orders left at Packed / Handover by the old three-step queue go back to Create manifest, keeping their AWB', async () => {
+  reset();
+  desk(1, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'packed', stepAt: T0, slip: { at: T0 } } });
+  desk(2, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'handover', stepAt: T0, packed: { awb: 'OLD123456', courier: 'Delhivery' } } });
+  desk(3, { stage: 'dispatch', fuNo: 0, dueAt: null, confirmedAt: T0, dq: { step: 'handover', stepAt: T0, packed: { awb: 'OLD777777', courier: 'Delhivery' }, manifest: { id: 'M9', courier: 'Delhivery' } } });
+  const b = await svc.dispatchBoard({ viewer: { id: 'adm', role: 'admin' } });
+  assert.deepEqual(b.columns.manifest.map((c) => c.orderId).sort(), [1, 2]);
+  assert.equal(get1(2).dq.awb.awb, 'OLD123456');
+  assert.deepEqual(b.columns.handover.map((c) => c.orderId), [3]); // already on a manifest: left alone
 });
 
 test('handover keeps every manifest photo for every order on the manifest', async () => {

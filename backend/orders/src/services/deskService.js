@@ -166,7 +166,7 @@ function cardOf(desk, shop, conf, ship) {
     dispatch: desk.dispatch && desk.dispatch.at ? desk.dispatch : null, confirmedAt: desk.confirmedAt || null, confirmedAtFu: desk.confirmedAtFu || '',
     shipway: ship ? { status: ship.status, group: ship.group, carrier: ship.carrier, awb: ship.awb, provider: ship.provider || 'shipway' } : null,
     provider: deskProviderOrNull(desk),
-    dq: desk.dq && desk.dq.step ? { step: desk.dq.step, provider: deskProviderOrNull(desk), shipCheck: desk.dq.shipCheck && desk.dq.shipCheck.state ? desk.dq.shipCheck : null, slip: desk.dq.slip || null, packed: desk.dq.packed || null, handover: desk.dq.handover || null, manifest: desk.dq.manifest && desk.dq.manifest.id ? desk.dq.manifest : null, manifestError: DP.manifestError(desk), hold: desk.dq.hold && desk.dq.hold.at ? desk.dq.hold : null } : null,
+    dq: desk.dq && desk.dq.step ? { step: desk.dq.step, provider: deskProviderOrNull(desk), shipCheck: desk.dq.shipCheck && desk.dq.shipCheck.state ? desk.dq.shipCheck : null, slip: desk.dq.slip || null, awb: desk.dq.awb && desk.dq.awb.awb ? desk.dq.awb : null, packed: desk.dq.packed || null, handover: desk.dq.handover || null, manifest: desk.dq.manifest && desk.dq.manifest.id ? desk.dq.manifest : null, manifestError: DP.manifestError(desk), hold: desk.dq.hold && desk.dq.hold.at ? desk.dq.hold : null } : null,
     refundDue: !!(desk.stage === 'cancelled' && desk.partial && desk.partial.amount),
   };
 }
@@ -430,14 +430,56 @@ async function liveAwb(orderId, { refresh = true } = {}) {
   }
   const ship = await ShipwayShipment.findOne({ orderId, found: true }).select('awb carrier provider').lean();
   const dconf = await getDispatchConfig();
-  const base = { provider, providerLabel: PR.labelOf(provider), configured: client.isConfigured(), shipwayConfigured: client.isConfigured(), allowManual: dconf.allowManualAwb };
+  const base = { provider, providerLabel: PR.labelOf(provider), configured: client.isConfigured(), shipwayConfigured: client.isConfigured(), allowManual: true };
   // a saved shipment only counts when it came from this order's own provider
-  if (ship && ship.awb && (ship.provider || 'shipway') === provider) return { ...base, awb: ship.awb, courier: ship.carrier || '', source: PR.labelOf(provider) };
+  if (ship && ship.awb && (ship.provider || 'shipway') === provider) {
+    const out = { ...base, awb: ship.awb, courier: ship.carrier || '', source: PR.labelOf(provider) };
+    await keepAwb(orderId, out.awb, out.courier);
+    return out;
+  }
   return { ...base, awb: '', courier: '', source: null };
+}
+
+// An AWB the service gave is saved on the order, so Create manifest can use it later without asking the service again. A typed AWB is never overwritten.
+async function keepAwb(orderId, awb, courier) {
+  if (!awb) return;
+  const doc = await DeskOrder.findOne({ orderId, stage: 'dispatch', 'dq.step': 'manifest' }).select('dq.awb dq.hold dq.step').lean();
+  if (!doc || (doc.dq && doc.dq.hold && doc.dq.hold.at)) return;
+  const cur = doc.dq && doc.dq.awb;
+  if (cur && cur.awb && cur.source === 'manual') return;
+  if (cur && cur.awb === awb && cur.courier === courier) return;
+  await DeskOrder.updateOne({ orderId, stage: 'dispatch', 'dq.step': 'manifest' }, { $set: { 'dq.awb': { awb, courier: courier || '', source: 'provider', at: new Date(), byName: 'Auto', byId: 'system' }, 'dq.shipCheck': null } });
+}
+
+// Orders at "Create manifest" whose AWB the service already gave (saved by the background sync) but that were never opened: save it on the order now.
+async function hydrateAwbs(docs) {
+  const need = docs.filter((d) => DP.stepOf(d) === 'manifest' && !DP.isHeld(d) && !(d.dq && d.dq.awb && d.dq.awb.awb));
+  if (!need.length) return;
+  const ships = await ShipwayShipment.find({ orderId: { $in: need.map((d) => d.orderId) }, found: true }).select('orderId awb carrier provider').lean();
+  const m = new Map(ships.map((x) => [x.orderId, x]));
+  for (const d of need) {
+    const x = m.get(d.orderId);
+    if (x && x.awb && (x.provider || 'shipway') === PR.providerOf(d)) { d.dq = { ...d.dq, awb: { awb: x.awb, courier: x.carrier || '', source: 'provider' } }; await keepAwb(d.orderId, x.awb, x.carrier || '').catch(() => {}); }
+  }
+}
+
+// Orders from the old three-step queue (Slip, Packed, Handover) that are still open: the manifest now comes before Packed.
+// Packed or handover WITHOUT a manifest means the box is packed but not manifested yet, so it goes back to Create manifest with its AWB kept.
+async function upgradeOldOrders() {
+  const old = await DeskOrder.find({ stage: 'dispatch', 'dq.step': { $in: ['packed', 'handover'] }, 'dq.manifest.id': { $in: [null, ''] }, 'dq.awb.awb': { $in: [null, ''] } }).select('orderId dq').lean();
+  for (const d of old) {
+    const fromPacked = d.dq.step === 'handover' && d.dq.packed && d.dq.packed.awb;
+    if (d.dq.step === 'packed' || fromPacked) {
+      const set = { 'dq.step': 'manifest' };
+      if (fromPacked) set['dq.awb'] = { awb: d.dq.packed.awb, courier: d.dq.packed.courier || '', source: 'provider', at: new Date(), byName: 'Upgrade', byId: 'system' };
+      await DeskOrder.updateOne({ orderId: d.orderId, 'dq.step': d.dq.step }, { $set: set }).catch(() => {});
+    }
+  }
 }
 
 async function dispatchBoard(opts = {}) {
   await ingestIfStale();
+  await upgradeOldOrders().catch((e) => console.warn('[desk] old-order upgrade failed:', e.message));
   const now = new Date();
   const [dconf, acfg] = await Promise.all([getDispatchConfig(), getAssignConfig()]);
   const filter = { stage: 'dispatch', ...assigneeFilter(opts, acfg) };
@@ -448,15 +490,18 @@ async function dispatchBoard(opts = {}) {
     withShop(desks, { ship: true }),
     DeskOrder.find({ stage: 'dispatch' }).select('orderId stage dq confirmedAt orderAt').lean(),
   ]);
+  await hydrateAwbs(all).catch((e) => console.warn('[desk] AWB save failed:', e.message));
+  const awbById = new Map(all.filter((d) => d.dq && d.dq.awb && d.dq.awb.awb).map((d) => [d.orderId, d.dq.awb]));
+  desks.forEach((d) => { if (!(d.dq && d.dq.awb && d.dq.awb.awb) && awbById.has(d.orderId)) d.dq = { ...d.dq, awb: awbById.get(d.orderId) }; });
   const everyone = all; // all orders in the queue: the courier list for "Create manifest" counts all of them, whatever the search box says
-  const columns = { slip: [], packed: [], handover: [] }; const hold = [];
+  const columns = { slip: [], manifest: [], packed: [], handover: [] }; const hold = [];
   cards.forEach((c, i) => {
     const d = desks[i]; const step = DP.stepOf(d); const due = DP.dueAt(d, dconf);
     (DP.isHeld(d) ? hold : columns[step]).push({
       ...c,
       dq: {
         step, stepAt: DP.stepStart(d), dueAt: due, overdue: !!due && due.getTime() < now.getTime(),
-        slip: (d.dq && d.dq.slip) || null, packed: (d.dq && d.dq.packed) || null,
+        slip: (d.dq && d.dq.slip) || null, packed: (d.dq && d.dq.packed) || null, awb: d.dq && d.dq.awb && d.dq.awb.awb ? d.dq.awb : null,
         hold: DP.isHeld(d) ? d.dq.hold : null,
         provider: deskProviderOrNull(d), // null at the packing slip step: not chosen yet
         shipCheck: d.dq && d.dq.shipCheck && d.dq.shipCheck.state ? d.dq.shipCheck : null, // last Shipway / Shiprocket answer, shown on the Order packed card
@@ -471,24 +516,47 @@ async function dispatchBoard(opts = {}) {
   hold.sort((a, b) => new Date(a.dq.hold.at) - new Date(b.dq.hold.at)); // longest on hold first
   const collect = cards.reduce((n, c) => n + (c.collect || 0), 0);
   const { groups, loose } = DP.groupByManifest(columns.handover);
-  // Order handover is two halves, one per provider: each has its own manifests, its own loose orders and its own courier list.
-  const handoverSide = (provider) => ({
+  const provOfCard = (c) => PR.providerOf({ dq: { provider: { name: c.dq.provider } } });
+  // Create manifest and Order handover are each split per provider. Create manifest lists the orders waiting for one plus the couriers that can get one now;
+  // Order handover lists the manifests ready to go (and any old order that reached handover without one).
+  const sideOf = (provider) => ({
     provider, label: PR.labelOf(provider),
     manifests: groups.filter((g) => g.provider === provider),
-    loose: loose.filter((c) => PR.providerOf({ dq: { provider: { name: c.dq.provider } } }) === provider).map((c) => c.orderId),
+    loose: loose.filter((c) => provOfCard(c) === provider).map((c) => c.orderId),
     couriers: DP.manifestCouriers(everyone, provider),
-    count: columns.handover.filter((c) => PR.providerOf({ dq: { provider: { name: c.dq.provider } } }) === provider).length,
+    count: columns.handover.filter((c) => provOfCard(c) === provider).length,
     configured: providerClient(provider).isConfigured(),
   });
-  return { now, config: dconf, cancelReasons: (await getConfig()).cancelReasons, columns, manifests: groups, looseHandover: loose.map((c) => c.orderId), manifestCouriers: DP.manifestCouriers(everyone), handover: { shipway: handoverSide('shipway'), shiprocket: handoverSide('shiprocket') }, hold, counts: DP.stepCounts(all, dconf, now), collectTotal: D.rupees(collect), shown: cards.length, assign: assignBrief(acfg, ['slip', 'packed', 'handover']) };
+  return { now, config: dconf, cancelReasons: (await getConfig()).cancelReasons, columns, manifests: groups, looseHandover: loose.map((c) => c.orderId), manifestCouriers: DP.manifestCouriers(everyone), handover: { shipway: sideOf('shipway'), shiprocket: sideOf('shiprocket') }, hold, counts: DP.stepCounts(all, dconf, now), collectTotal: D.rupees(collect), shown: cards.length, assign: assignBrief(acfg, ['slip', 'manifest', 'packed', 'handover']) };
 }
 
 // provider: 'shipway' | 'shiprocket'. The packing team must say which one this order ships from before the slip can be marked done.
-async function dispatchSlip(user, orderId, { provider } = {}) {
+// awb / courier: optional, only when the service had no AWB to fetch and the person typed it right away.
+async function dispatchSlip(user, orderId, { provider, awb, courier } = {}) {
   const chosen = DP.cleanProvider(provider);
   const { doc } = await loadForAction(orderId, user);
-  const t = DP.slipDone(doc, await getDispatchConfig(), user, new Date(), { provider: chosen });
+  const input = { provider: chosen };
+  if (awb) { input.awb = awb; input.courier = courier; await assertAwbFree(orderId, awb, chosen); }
+  const t = DP.slipDone(doc, await getDispatchConfig(), user, new Date(), input);
   return brief(await applyTransition(doc, t));
+}
+
+const awbClash = async (orderId, raw) => {
+  const clean = DP.cleanAwb(raw);
+  const clash = await DeskOrder.findOne({ orderId: { $ne: orderId }, $or: [{ 'dq.awb.awb': clean }, { 'dq.packed.awb': clean }] }).select('orderId').lean();
+  return { clean, clash };
+};
+async function assertAwbFree(orderId, raw, provider) {
+  const { clean, clash } = await awbClash(orderId, raw);
+  if (clash) throw httpErr(409, `AWB ${clean} is already on order #${clash.orderId}. Check the shipment in ${PR.labelOf(provider)}.`);
+}
+
+// The service had no AWB for this order, so the person types it (and the courier name: manifests are made per courier).
+async function dispatchAwb(user, orderId, { awb, courier } = {}) {
+  const { doc } = await loadForAction(orderId, user);
+  await assertAwbFree(orderId, awb, PR.providerOf(doc));
+  const t = DP.awbSaved(doc, { awb, courier, source: 'manual' }, user);
+  return brief(await applyTransition(doc, t, { assign: false }));
 }
 
 // Ask the services about every order at "Order packed" and save the answer on each card (lib/shipState.js says what the answers mean).
@@ -533,27 +601,16 @@ const checkPhotos = (files) => {
 };
 const dropProofs = (proofs) => (proofs.length ? DispatchProof.deleteMany({ _id: { $in: proofs.map((x) => x._id) } }).catch(() => {}) : null);
 
-// The person only adds the photos. AWB and courier are taken from Shipway here on the server, so a typed or pasted value cannot differ from the label.
-// Only when Shipway has no AWB for the order yet (and Settings allows it) is the typed AWB used.
-async function dispatchPacked(user, orderId, { awb, courier, files = [] }) {
+// Order packed: the box is packed. The AWB and the manifest were settled in the steps before. Photos of the box are optional (Settings can require them).
+async function dispatchPacked(user, orderId, { files = [] } = {}) {
   const { doc } = await loadForAction(orderId, user);
   const dconf = await getDispatchConfig();
   checkPhotos(files);
-  const live = await liveAwb(orderId);
-  let useAwb = live.awb; let useCourier = live.courier;
-  if (!useAwb) {
-    if (!dconf.allowManualAwb) throw httpErr(409, `${live.providerLabel} has no AWB for this order yet. Create the shipment in ${live.providerLabel}, then press Fetch again.`);
-    useAwb = awb; useCourier = courier || '';
-  }
-  const input = { awb: useAwb, courier: useCourier, photoIds: files.map((_, i) => `pending${i}`) };
-  DP.packedDone(doc, input, dconf, user); // dry run: every rule is checked before anything is stored
-  const clean = DP.cleanAwb(useAwb);
-  const clash = await DeskOrder.findOne({ orderId: { $ne: orderId }, 'dq.packed.awb': clean }).select('orderId').lean();
-  if (clash) throw httpErr(409, `AWB ${clean} is already on order #${clash.orderId}. Check the shipment in ${live.providerLabel}.`);
+  DP.packedDone(doc, { photoIds: files.map((_, i) => `pending${i}`) }, dconf, user); // dry run: every rule is checked before anything is stored
   const proofs = [];
   try {
     for (const f of files) proofs.push(await storeProof('package', f, user, { orderId }));
-    const t = DP.packedDone(doc, { ...input, photoIds: proofs.map((x) => String(x._id)) }, dconf, user);
+    const t = DP.packedDone(doc, { photoIds: proofs.map((x) => String(x._id)) }, dconf, user);
     return brief(await applyTransition(doc, t));
   } catch (e) { await dropProofs(proofs); throw e; }
 }
@@ -573,16 +630,18 @@ async function createManifest(user, { courier, orderIds, provider }) {
   if (manifestBusy.has(key)) throw httpErr(409, `A ${want} manifest is already being created at ${label}. Wait a few seconds and refresh.`);
   manifestBusy.add(key);
   try {
-    const docs = (await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'handover' }).sort({ confirmedAt: 1 }).lean())
-      .filter((d) => DP.eligibleForManifest(d) && PR.providerOf(d) === prov && DP.sameCourier(d.dq.packed && d.dq.packed.courier, want));
+    const raw = await DeskOrder.find({ stage: 'dispatch', 'dq.step': 'manifest' }).sort({ confirmedAt: 1 }).lean();
+    await hydrateAwbs(raw).catch(() => {});
+    const docs = raw
+      .filter((d) => DP.eligibleForManifest(d) && PR.providerOf(d) === prov && DP.sameCourier(DP.awbOf(d).courier, want));
     // The team ticks the orders that are really packed. Only those go on the manifest; the rest stay waiting.
     const ticked = Array.isArray(orderIds) ? new Set(orderIds.map(Number).filter(Number.isInteger)) : null;
-    if (ticked && !ticked.size) throw httpErr(400, 'Tick at least one packed order');
+    if (ticked && !ticked.size) throw httpErr(400, 'Tick at least one order');
     const pool = ticked ? docs.filter((d) => ticked.has(d.orderId)) : docs;
     const allowed = []; const skipped = [];
     if (ticked) for (const id of ticked) if (!docs.some((d) => d.orderId === id)) skipped.push({ orderId: id, reason: `No longer waiting for a ${label} manifest (already on one, held, another courier, or booked with the other service)` });
     for (const d of pool) { try { await assertCanWork(user, d); allowed.push(d); } catch (e) { skipped.push({ orderId: d.orderId, reason: e.message }); } }
-    if (!allowed.length) throw httpErr(409, `No packed ${want} orders are waiting for a ${label} manifest.${skipped.length ? ` ${skipped.length} are assigned to someone else.` : ''}`);
+    if (!allowed.length) throw httpErr(409, `No ${want} orders with an AWB are waiting for a ${label} manifest.${skipped.length ? ` ${skipped.length} are assigned to someone else.` : ''}`);
     const batch = allowed.slice(0, DP.MAX_HANDOVER_BATCH);
     const leftOver = allowed.length - batch.length;
     const readKnown = async () => new Map((await ShipwayShipment.find({ orderId: { $in: batch.map((d) => d.orderId) } }).select('orderId shipwayOrderId shipmentId provider status checkedAt').lean()).filter((k) => (k.provider || 'shipway') === prov).map((k) => [k.orderId, k]));
@@ -645,7 +704,7 @@ async function createManifest(user, { courier, orderIds, provider }) {
     } else {
       sent = live.map((d) => ({ orderId: d.orderId, shipwayId: client.shipwayIdFor(d.orderId, kmap.get(d.orderId) && kmap.get(d.orderId).shipwayOrderId) }));
       if (!sent.length) return { provider: prov, providerLabel: label, manifestId: null, manifestUrl: '', courier: want, created: [], rejected: await (async () => { for (const r of blocked) { try { await applyTransition(batch.find((d) => d.orderId === r.orderId), DP.manifestRejected(batch.find((d) => d.orderId === r.orderId), { reason: r.reason, courier: want }, user), { assign: false }); } catch (e) { /* the reason is still returned to the screen */ } } return blocked; })(), failed: [], skipped, leftOver, shipwayMessage: '' };
-      try { reply = await client.createManifest({ orders: sent, courier: (live[0].dq.packed && live[0].dq.packed.courier) || want }); }
+      try { reply = await client.createManifest({ orders: sent, courier: DP.awbOf(live[0]).courier || want }); }
       catch (e) { throw httpErr(502, e.message || 'Shipway could not be reached. Nothing was changed.'); } // 502, not 401: a provider login problem must not sign the person out
       const rawReply = (() => { try { return JSON.stringify(reply).slice(0, 1500); } catch { return String(reply).slice(0, 1500); } })();
       console.log('[manifest] Shipway reply for', want, ':', rawReply); // so support can see exactly what Shipway sent
@@ -979,4 +1038,4 @@ function start() {
   }
 }
 
-module.exports = { staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchProvider, dispatchCheck, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };
+module.exports = { keepAwb, staleQueue, getAssignConfig, saveAssignConfig, assignOverview, autoAssign, assignManual, assignBulk, rebalance, team, callBoard, analysisData, analysisSheet, getConfig, saveConfig, getDispatchConfig, saveDispatchConfig, liveAwb, createManifest, dispatchBoard, dispatchHold, dispatchResume, dispatchCancel, dispatchSlip, dispatchAwb, dispatchProvider, dispatchCheck, dispatchPacked, dispatchHandover, proofFile, transitList, refreshTransit, ingest, ingestIfStale, act, savePartial, shotFile, counts, queue, ordersList, orderDetail, overview, funnel, refresh, start, cardOf };

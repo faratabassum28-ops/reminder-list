@@ -67,7 +67,7 @@ function load(docs) {
   Module._load = prev;
   return { sync, writes };
 }
-const packed = (orderId, provider, shipCheck) => ({ orderId, stage: 'dispatch', dq: { step: 'packed', ...(provider ? { provider: { name: provider } } : {}), ...(shipCheck ? { shipCheck } : {}) } });
+const packed = (orderId, provider, shipCheck) => ({ orderId, stage: 'dispatch', dq: { step: 'manifest', ...(provider ? { provider: { name: provider } } : {}), ...(shipCheck ? { shipCheck } : {}) } });
 
 test('check: cancelled, waiting and AWB-ready orders each get the right answer, saved on the order', async () => {
   rocket._reset(); fakeApi();
@@ -81,6 +81,9 @@ test('check: cancelled, waiting and AWB-ready orders each get the right answer, 
   assert.equal(by[2900].state, 'awb_ready');
   assert.equal(by[2900].awb, 'SR900');
   assert.equal(by[2900].courier, 'Delhivery');
+  const awbSaved = writes.find((w) => w.filter.orderId === 2900).set['dq.awb']; // the fetched AWB is kept on the order for Create manifest
+  assert.equal(awbSaved.awb, 'SR900'); assert.equal(awbSaved.courier, 'Delhivery'); assert.equal(awbSaved.source, 'provider');
+  assert.equal(writes.find((w) => w.filter.orderId === 2828).set['dq.awb'], undefined);
   assert.equal(by[3000].state, 'not_found');
   assert.deepEqual([r.summary.all.cancelled, r.summary.all.waiting, r.summary.all.awb_ready, r.summary.all.not_found], [1, 1, 1, 1]);
   assert.ok(by[2509].at instanceof Date);
@@ -91,7 +94,7 @@ test('check: a card that was switched or moved on meanwhile is not overwritten (
   const { sync, writes } = load([packed(2828, 'shiprocket')]);
   await sync.checkPacked({});
   assert.equal(writes[0].filter.stage, 'dispatch');
-  assert.equal(writes[0].filter['dq.step'], 'packed');
+  assert.equal(writes[0].filter['dq.step'], 'manifest');
   assert.equal(writes[0].filter['dq.provider.name'], 'shiprocket');
 });
 

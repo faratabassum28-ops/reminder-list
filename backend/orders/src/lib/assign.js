@@ -1,10 +1,10 @@
 // Who works which order: pure functions only (no database, no network), so every rule can be unit-tested.
-// Every open order sits in exactly one "slot" (the column it is in on a board): FU1, FU2, FU3, Pending Day 1-3, Packing slip, Order packed, Order handover.
+// Every open order sits in exactly one "slot" (the column it is in on a board): FU1, FU2, FU3, Pending Day 1-3, Packing slip, Create manifest, Order packed, Order handover.
 // Each slot has its own rule: off (everyone sees it), manual (an admin picks the person) or auto (shared out in a ratio).
 // The service (services/deskService.js) stores what these functions return.
 const DP = require('./dispatch');
 
-const SLOTS = ['confirm1', 'confirm2', 'confirm3', 'pending1', 'pending2', 'pending3', 'slip', 'packed', 'handover'];
+const SLOTS = ['confirm1', 'confirm2', 'confirm3', 'pending1', 'pending2', 'pending3', 'slip', 'manifest', 'packed', 'handover'];
 const MODES = ['off', 'manual', 'auto'];
 const MAX_WEIGHT = 100;
 const MAX_MEMBERS = 60;

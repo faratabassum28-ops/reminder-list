@@ -28,9 +28,10 @@ function StaleQueue() {
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; // 0 = Monday, as the server numbers them
 const hm = (t) => { const [h, m] = String(t || '12:00').split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 const DQ_STAGES = [
-  ['slip', 'stepSlip', 'An order enters this step the moment it is confirmed. Press DONE after the slip is printed and stuck on the box.', false],
-  ['packed', 'stepPacked', 'Counted from when the packing slip was marked done. DONE opens the form: the AWB and courier are filled from Shipway, and the person adds photos of the package.', true],
-  ['handover', 'stepHandover', 'Counted from when the order was packed. DONE opens the form with the photos of the manifest; the order then moves to In-transit orders.', true],
+  ['slip', 'stepSlip', 'An order enters this step the moment it is confirmed. Press DONE after the slip is printed and stuck on the box, then choose Shipway or Shiprocket. The AWB is fetched; if the service has none, the person types it.', false],
+  ['manifest', 'stepManifest', 'Counted from when the packing slip was marked done. The team creates one manifest per courier for the orders that have an AWB.', false],
+  ['packed', 'stepPacked', 'Counted from when the order was put on a manifest. DONE is one tap: the AWB and manifest are already known.', true],
+  ['handover', 'stepHandover', 'Counted from when the order was packed. The person selects the manifest and adds a photo of it; the order then moves to In-transit orders.', true],
 ];
 
 // nameKey: this row's name can be changed right here (Settings is admin-only, on the screen and on the server).
@@ -162,8 +163,7 @@ export default function DeskSettings() {
             <p className="cap">{cap}</p>
             <label className="sd-set-row"><span><b>Due by</b><small>Time of day (IST) on the due working day.</small></span><input type="time" value={st.dueTime} onChange={(e) => setStage(k, 'dueTime', e.target.value)} /></label>
             <NumRow label="Working days allowed" hint="0 = the same working day (the next one if this time has already passed). 1 = the next working day." value={st.dayOffset} onChange={(v) => setStage(k, 'dayOffset', v)} unit="days" step="1" />
-            {photo && k !== 'packed' && <label className="sd-check"><input type="checkbox" checked={!!st.requirePhoto} onChange={(e) => setStage(k, 'requirePhoto', e.target.checked)} /> Require at least one {k === 'packed' ? 'photo of the package' : 'photo of the manifest'} before {L('btnDone')}</label>}
-            {k === 'packed' && <label className="sd-check"><input type="checkbox" checked={dq.allowManualAwb} onChange={(e) => setDq((x) => ({ ...x, allowManualAwb: e.target.checked }))} /> If Shipway has no AWB for an order yet, let the person type it (otherwise they wait for Shipway)</label>}
+            {photo && <label className="sd-check"><input type="checkbox" checked={!!st.requirePhoto} onChange={(e) => setStage(k, 'requirePhoto', e.target.checked)} /> Require at least one {k === 'packed' ? 'photo of the packed box' : 'photo of the manifest'} {k === 'packed' ? `when pressing ${L('btnDone')}` : `before ${L('btnDone')}`}</label>}
             <p className="sd-sum">{n === 0 ? `Due by ${hm(st.dueTime)} on a working day: the same day if the step starts earlier than that, otherwise the next working day.` : `Due by ${hm(st.dueTime)}, ${n} working day${n === 1 ? '' : 's'} after the step starts.`}</p>
           </div>
         );

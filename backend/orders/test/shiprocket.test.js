@@ -15,7 +15,7 @@ const apply = (d, t) => ({ ...d, ...t.set });
 // ------------------------------------------------------------ choosing the provider at the packing slip
 test('marking the slip done stores which provider the team chose', () => {
   const d = apply(doc(), P.slipDone(doc(), conf, who, ist('2026-10-19T10:00:00'), { provider: 'shiprocket' }));
-  assert.equal(d.dq.step, 'packed');
+  assert.equal(d.dq.step, 'manifest');
   assert.equal(d.dq.provider.name, 'shiprocket');
   assert.equal(d.dq.provider.byName, 'Rahul');
   assert.equal(PR.providerOf(d), 'shiprocket');
@@ -38,7 +38,7 @@ test('orders that predate Shiprocket count as Shipway', () => {
 });
 
 // ------------------------------------------------------------ manifests are per provider
-const packed = (id, courier, provider, extra = {}) => ({ orderId: id, stage: 'dispatch', dq: { step: 'handover', packed: { awb: `AWB${id}XX`, courier }, ...(provider ? { provider: { name: provider } } : {}), ...extra } });
+const packed = (id, courier, provider, extra = {}) => ({ orderId: id, stage: 'dispatch', dq: { step: 'manifest', awb: { awb: `AWB${id}XX`, courier }, ...(provider ? { provider: { name: provider } } : {}), ...extra } });
 
 test('manifestCouriers lists each provider separately', () => {
   const docs = [packed(1, 'Delhivery', 'shipway'), packed(2, 'Delhivery', 'shiprocket'), packed(3, 'Delhivery', 'shiprocket'), packed(4, 'Bluedart', null)];
@@ -67,16 +67,18 @@ test('groupByManifest carries the provider so the board can split the two halves
 
 test('handover records the provider on the in-transit order', () => {
   let d = apply(doc(), P.slipDone(doc(), conf, who, ist('2026-10-19T10:00:00'), { provider: 'shiprocket' }));
-  d = apply(d, P.packedDone(d, { awb: 'SR123456', courier: 'Delhivery' }, conf, who));
+  d = apply(d, P.awbSaved(d, { awb: 'SR123456', courier: 'Delhivery' }, who));
+  d = apply(d, P.manifestAssigned(d, { manifestId: 'SR-1', courier: 'Delhivery' }, who));
+  d = apply(d, P.packedDone(d, {}, conf, who));
   const t = P.handoverDone(d, { manifestIds: ['p1'] }, conf, who);
   assert.equal(t.set.dispatch.provider, 'shiprocket');
   assert.match(t.entries[0].label, /via Shiprocket/);
 });
 
-test('stepCounts splits packed and handover by provider', () => {
+test('stepCounts splits manifest, packed and handover by provider', () => {
   const docs = [packed(1, 'A', 'shipway'), packed(2, 'A', 'shiprocket'), packed(3, 'A', 'shiprocket')];
   const c = P.stepCounts(docs, conf, ist('2026-10-19T10:00:00'));
-  assert.deepEqual(c.byProvider, { shipway: { packed: 0, handover: 1 }, shiprocket: { packed: 0, handover: 2 } });
+  assert.deepEqual(c.byProvider, { shipway: { manifest: 1, packed: 0, handover: 0 }, shiprocket: { manifest: 2, packed: 0, handover: 0 } });
 });
 
 // ------------------------------------------------------------ Shiprocket status -> the codes the rest of the app reads
@@ -159,14 +161,15 @@ test('a "success" with no link is NOT treated as a manifest', () => {
 });
 
 // ------------------------------------------------------------ switching the service at "Order packed"
-const atPacked = (extra = {}) => ({ orderId: 2509, stage: 'dispatch', dq: { step: 'packed', ...extra } });
+const atPacked = (extra = {}) => ({ orderId: 2509, stage: 'dispatch', dq: { step: 'manifest', ...extra } });
 
-test('an order at Order packed can be moved from Shipway to Shiprocket and back, and the change is logged', () => {
+test('an order at Create manifest can be moved from Shipway to Shiprocket and back, and the change is logged', () => {
   const d = atPacked(); // no choice recorded = Shipway
   const t = P.providerChanged(d, { provider: 'shiprocket' }, who, ist('2026-10-19T10:00:00'));
   assert.equal(t.set.dq.provider.name, 'shiprocket');
   assert.equal(t.set.dq.provider.from, 'shipway');
-  assert.equal(t.set.dq.step, 'packed'); // same column, same deadline
+  assert.equal(t.set.dq.step, 'manifest'); // same column, same deadline
+  assert.equal(t.set.dq.awb, null); // the AWB belonged to the other service
   assert.match(t.entries[0].label, /Switched from Shipway to Shiprocket/);
   const back = P.providerChanged({ ...d, ...t.set }, { provider: 'shipway' }, who);
   assert.equal(back.set.dq.provider.name, 'shipway');
@@ -178,7 +181,7 @@ test('switching to the service the order already uses, or to nothing, is refused
 });
 
 test('the service cannot be changed once the AWB is saved, or before the slip is done', () => {
-  assert.throws(() => P.providerChanged({ orderId: 1, stage: 'dispatch', dq: { step: 'handover' } }, { provider: 'shiprocket' }, who), (e) => e.status === 409 && /already has an AWB/.test(e.message));
+  assert.throws(() => P.providerChanged({ orderId: 1, stage: 'dispatch', dq: { step: 'handover' } }, { provider: 'shiprocket' }, who), (e) => e.status === 409 && /already on a manifest/.test(e.message));
   assert.throws(() => P.providerChanged({ orderId: 1, stage: 'dispatch', dq: { step: 'slip' } }, { provider: 'shiprocket' }, who), (e) => e.status === 409 && /packing slip/.test(e.message));
   assert.throws(() => P.providerChanged({ orderId: 1, stage: 'cancelled' }, { provider: 'shiprocket' }, who), (e) => e.status === 409);
 });

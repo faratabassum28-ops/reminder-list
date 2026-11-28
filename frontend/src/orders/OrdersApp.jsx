@@ -11,7 +11,7 @@ import { StaffProvider, useStaff } from "./staff.jsx";
 import { FilterProvider } from "./filters.jsx";
 import { isAdmin, rolesOf, ROLE_LABEL } from "./flowUi.js";
 import { deskHome } from "./pages/desk/deskHome.js";
-import { LabelsProvider } from "./pages/desk/shared.jsx";
+import { LabelsProvider, useLabels } from "./pages/desk/shared.jsx";
 import "./orders.css";
 
 const Overview = lazyRetry(() => import("./pages/Overview.jsx"));
@@ -36,7 +36,14 @@ const O = "/orders";
 // Third item 'sub' = an indented entry that lives under the item above it.
 const NAV = [
   ["", "Overview", "overview"],
-  ["/shopify-desk", "Shopify desk", "desk"],
+  ["/shopify-desk", "Shopify desk", "desk", "head"],
+  ["/shopify-desk/confirm", "tabConfirm", "deskConfirm", "sub"],
+  ["/shopify-desk/pending", "tabPending", "deskPending", "sub"],
+  ["/shopify-desk/dispatch", "tabDispatch", "deskDispatch", "sub"],
+  ["/shopify-desk/transit", "tabTransit", "deskTransit", "sub"],
+  ["/shopify-desk/partial", "tabPartial", "deskPartial", "sub"],
+  ["/shopify-desk/cancelled", "tabCancelled", "deskCancelled", "sub"],
+  ["/shopify-desk/settings", "tabSettings", "deskSettings", "sub"],
   ["/desk-overview", "Desk overview", "deskOverview", "sub"],
   ["/order-funnel", "Order funnel", "deskFunnel", "sub"],
   ["/shopify-orders", "Shopify orders", "deskOrders", "sub"],
@@ -55,8 +62,8 @@ const NAV = [
 
 // Which pages each team may open. Admin sees all of NAV; the others get exactly these (the server enforces the same rules).
 const ROLE_PAGES = {
-  confirmation: ["overview", "desk", "deskOrders", "deskAnalysis", "ndr", "rto"],
-  packing: ["overview", "desk", "deskOrders", "deskAnalysis", "ndr", "rto", "weight"],
+  confirmation: ["overview", "desk", "deskConfirm", "deskPending", "deskTransit", "deskPartial", "deskCancelled", "deskOrders", "deskAnalysis", "ndr", "rto"],
+  packing: ["overview", "desk", "deskDispatch", "deskTransit", "deskOrders", "deskAnalysis", "ndr", "rto", "weight"],
 };
 // These pages read the desk's own labels, so each one is wrapped in the same provider the desk uses.
 const Desk = ({ title, children }) => <LabelsProvider><div className="sd"><div className="sd-top"><h1>{title}</h1></div><div className="sd-body">{children}</div></div></LabelsProvider>;
@@ -86,10 +93,14 @@ function useBadges() {
 // Live counts next to the desks (red = calls due now, grey = how many are open).
 function Badge({ keyName, badges }) {
   if (!badges) return null;
-  if (keyName === "desk" && badges.shop) {
-    const due = badges.shop.confirm.due + badges.shop.pending.due;
-    const open = badges.shop.confirm.total + badges.shop.pending.total;
-    if (open > 0) return <span className={`nav-badge ${due > 0 ? "bad" : ""}`} title={`${due} calls due now`}>{due > 0 ? due : open}</span>;
+  const sh = badges.shop;
+  if (sh) {
+    const pill = (open, hot, hotTitle) => (open > 0 ? <span className={`nav-badge ${hot > 0 ? "bad" : ""}`} title={hot > 0 ? `${hot} ${hotTitle}` : `${open} open`}>{hot > 0 ? hot : open}</span> : null);
+    if (keyName === "deskConfirm" && sh.confirm) return pill(sh.confirm.total, sh.confirm.due, "calls due now");
+    if (keyName === "deskPending" && sh.pending) return pill(sh.pending.total, sh.pending.due, "calls due now");
+    if (keyName === "deskDispatch") return pill(sh.dispatch, sh.dispatchSteps ? sh.dispatchSteps.overdue : 0, "overdue");
+    if (keyName === "deskPartial") return pill(sh.partial, 0, "");
+    if (keyName === "deskCancelled") return pill(sh.cancelled, 0, "");
   }
   const c = badges.cases;
   if (c) {
@@ -133,6 +144,9 @@ function SyncNote() {
   );
 }
 
+// The desk pages in the sidebar use the names the admin chose in Settings (Names & labels).
+function NavLabel({ text }) { const { L } = useLabels(); return <>{/^tab[A-Z]/.test(text) ? L(text) : text}</>; }
+
 function Shell({ user }) {
   const { logout, hasReminder, hasWorkshop, hasTickets, hasCertificates, hasEmi, hasLeadFms, hasSalesFms } = useAuth();
   const navigate = useNavigate();
@@ -166,17 +180,21 @@ function Shell({ user }) {
               <div className="brand">MySoul Orders<small>Sheet analytics</small></div>
               <button type="button" className="oa-iconbtn" onClick={() => setCollapsed(true)} aria-label="Hide menu" title="Hide menu">«</button>
             </div>
-            {nav.map(([to, label, key, kind]) => (
-              <NavLink
-                key={key}
-                to={to}
-                end={key === "overview"}
-                className={({ isActive }) => `${kind === "sub" ? "sub " : ""}${isActive ? "active" : ""}`}
-                onClick={() => setCollapsed(true)}
-              >
-                {label}<Badge keyName={key} badges={badges} />
-              </NavLink>
-            ))}
+            <LabelsProvider>
+              {nav.map(([to, label, key, kind]) => (kind === "head" ? (
+                <div key={key} className="side-head" style={{ padding: "10px 10px 4px", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ink-3)" }}>{label}</div>
+              ) : (
+                <NavLink
+                  key={key}
+                  to={to}
+                  end={key === "overview"}
+                  className={({ isActive }) => `${kind === "sub" ? "sub " : ""}${isActive ? "active" : ""}`}
+                  onClick={() => setCollapsed(true)}
+                >
+                  <span><NavLabel text={label} /></span><Badge keyName={key} badges={badges} />
+                </NavLink>
+              )))}
+            </LabelsProvider>
             <div className="spacer" />
             {isAdmin(user) && <SyncNote />}
             <div className="oa-foot">

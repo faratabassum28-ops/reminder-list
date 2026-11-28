@@ -18,7 +18,7 @@ const GROUPS = [
     ['day1', 'Day 1', 'First pending follow-up'], ['day2', 'Day 2', 'Second pending follow-up'], ['day3', 'Day 3', 'Third pending follow-up'],
   ] },
   { title: 'Dispatch queue columns', items: [
-    ['stepSlip', 'Packing slip', ''], ['stepPacked', 'Order packed', ''], ['stepHandover', 'Order handover', ''],
+    ['stepSlip', 'Packing slip', ''], ['stepManifest', 'Create manifest', ''], ['stepPacked', 'Order packed', ''], ['stepHandover', 'Order handover', ''],
   ] },
   { title: 'Buttons and outcomes', items: [
     ['btnCall', 'Call', 'Call button on a card'], ['btnUpdate', 'Update status', ''], ['btnDone', 'DONE', 'Button on a dispatch card'],
