@@ -129,7 +129,7 @@ function Scorecard({ data, compareLabel, mine }) {
       <h2 className="sd-h2">{mine ? 'Your task scorecard: are you doing your work on time?' : 'Task scorecard: are they doing their work on time?'}</h2>
       <p className="cap">Every follow-up call (FU1–FU3, Day 1–3) and every dispatch step (packing slip, packed, handover) has a deadline. A task counts here when its deadline falls in the period you picked.</p>
       <div className="sd-kpis tp-kpis">
-        <Kpi label={mine ? 'Your score' : 'Team score'} value={tt.score == null ? '—' : `${tt.score}/100`} sub={<Grade g={tt.grade} />} tone={tt.grade === 'excellent' || tt.grade === 'good' ? 'good' : tt.grade === 'none' ? '' : 'bad'} chip={tp && tp.score != null && tt.score != null ? <DeltaChip type="count" cur={tt.score} prev={tp.score} up="good" /> : null} hint={`Done on time earns 1 point, done late half a point, not done 0. ${compareLabel}`} />
+        <Kpi label={mine ? 'Your score' : 'Score'} value={tt.score == null ? '—' : `${tt.score}/100`} sub={<Grade g={tt.grade} />} tone={tt.grade === 'excellent' || tt.grade === 'good' ? 'good' : tt.grade === 'none' ? '' : 'bad'} chip={tp && tp.score != null && tt.score != null ? <DeltaChip type="count" cur={tt.score} prev={tp.score} up="good" /> : null} hint={`Done on time earns 1 point, done late half a point, not done 0. ${compareLabel}`} />
         <Kpi label="Tasks due" value={int(tt.due)} sub={`${int(tt.assigned)} assigned to people in this period`} tone="" chip={tp && <Delta cur={tt.due} prev={tp.due} />} hint="Tasks whose deadline fell in this period" />
         <Kpi label="Done on time" value={int(tt.onTime)} sub={tt.due ? `${pct(tt.onTimeRate.v, 0)} of tasks due` : 'Nothing was due'} tone="good" chip={tp && tp.due > 0 ? <DeltaChip type="pct" cur={tt.onTimeRate} prev={tp.onTimeRate} up="good" /> : null} hint="Finished before the task turned overdue (2 hours after its deadline for calls)" />
         <Kpi label="Done late" value={int(tt.late)} sub="finished after it turned overdue" tone="warn" hint="Completed, but after the deadline and grace time" />
@@ -196,7 +196,7 @@ export default function TeamDashboard() {
     <>
       <FilterBar f={f} range={data && data.range} updated={stamp} onRefresh={reload} busy={loading && !!data} />
       <div className="page tp-page">
-        <h1>{mine ? 'My performance' : 'Team performance'}</h1>
+        <h1>{mine ? 'My Performance' : 'Team Performance'}</h1>
         {mine ? <p className="lede">How you are doing: first, whether your tasks are done on time, then your work volume. Only your own numbers are shown here.</p> : <p className="lede">How the team is doing: first, whether tasks are done on time, then the work volume. Every call, confirmation, packing slip, pack and courier handover, counted on the day it was done. Includes the <Link to="/orders/shopify-desk">Shopify desk</Link> and the older sheet-based queues. Click a person to see their detail.</p>}
         {!f.ready && <div className="banner">Pick both a “From” and a “To” date (the “To” date cannot be before “From”).</div>}
         <Loading error={error} loading={(loading && !data) || !f.ready}>

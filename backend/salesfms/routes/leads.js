@@ -39,7 +39,7 @@ router.get("/config", wrap(async (req, res) => {
 }));
 router.put("/config", adminOnly, wrap(async (req, res) => {
   const b = req.body || {}, applyToExisting = b.applyToExisting !== false;
-  delete b.lastSync; delete b.bookingStatus; delete b.applyToExisting; delete b.share; delete b.integrations; // the daily share has its own endpoint
+  delete b.lastSync; delete b.assignedWaiting; delete b.bookingStatus; delete b.applyToExisting; delete b.share; delete b.integrations; // the daily share has its own endpoint
   const prev = await S.getCfg(), next = { ...prev, ...b };
   next.plan = S.cleanPlan(next.plan, "Lead follow-ups");
   next.attPlan = S.cleanPlan(next.attPlan, "Attendee follow-ups");
@@ -59,11 +59,13 @@ router.put("/config", adminOnly, wrap(async (req, res) => {
   else next.bookingFrom = new Date().toISOString();
   if (!Array.isArray(next.statuses) || !next.statuses.length) throw fail("Add at least one call status");
   await S.setCfg(next);
+  // somebody was just ticked / marked present: leads that were waiting with nobody to take them are handed out now
+  const waiting = next.assign ? await S.assignUnassigned(next).catch(() => 0) : 0;
   // a follow-up was ADDED or REMOVED -> every existing lead follows the new plan (and so to Today / Delayed / Attendee Follow-ups)
   const wsKey = (c) => JSON.stringify([c.workshops || [], c.wsDefault || {}]);
   const changed = next.plan.length !== prev.plan.length || next.attPlan.length !== prev.attPlan.length || wsKey(next) !== wsKey(prev); // also when a workshop's days / follow-ups changed
   const added = changed && applyToExisting ? await S.addStepsToExistingLeads(await S.getCfg()) : null;
-  res.json({ ...(await S.getCfg()), ...(added ? { addedToLeads: added.leads, addedSteps: added.steps, removedSteps: added.removed } : {}) });
+  res.json({ ...(await S.getCfg()), ...(waiting ? { assignedWaiting: waiting } : {}), ...(added ? { addedToLeads: added.leads, addedSteps: added.steps, removedSteps: added.removed } : {}) });
 }));
 
 // the chooser card on the Hub

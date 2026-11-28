@@ -193,7 +193,9 @@ function AssignPanel({ c, setC, leads, saving, onReshare }) {
   const [team, setTeam] = useState(null);
   useEffect(() => { api.ldTeam().then(setTeam).catch(() => setTeam([])); }, []);
   const A = c.assign;
-  const people = (team || []).filter((p) => p.active && p.leadName).filter((p, i, a) => a.findIndex((x) => x.leadName.toLowerCase() === p.leadName.toLowerCase()) === i);
+  // A caller with no separate "caller name" is assigned leads under their account name (the server does the same), so they
+  // belong in this list too — filtering on leadName alone hid them and they could never be ticked.
+  const people = (team || []).filter((p) => p.active).map((p) => ({ ...p, leadName: (p.leadName || p.name || "").trim() })).filter((p) => p.leadName).filter((p, i, a) => a.findIndex((x) => x.leadName.toLowerCase() === p.leadName.toLowerCase()) === i);
   const setQ = (k, patch) => setC({ ...c, assign: { ...A, queues: { ...A.queues, [k]: { ...A.queues[k], ...patch } } } });
   // everyone on the team, merged with what is saved. A column that was never set up starts with every caller ticked.
   const rowsOf = (k) => {

@@ -50,7 +50,7 @@ export default function WorkshopApp() {
 
   const links = [
     { to: "/workshops", label: "Overview", end: true, icon: "overview" },
-    { to: "/workshops/dashboard", label: "Dashboard", icon: "dashboard" },
+    { to: "/workshops/dashboard", label: "Team Performance", icon: "dashboard" },
     ...(canRequestWorkshops ? [{ to: "/workshops/new", label: "New Workshop", icon: "new" }] : []),
     ...(canRequestWorkshops ? [{ to: "/workshops/requests", label: isAdmin ? "Approvals" : "My Requests", icon: "requests", badge: isAdmin ? stats?.pendingApproval : 0 }] : []),
     ...(canRequestWorkshops ? [{ to: "/workshops/plan", label: "Workshops", icon: "workshops" }] : []),

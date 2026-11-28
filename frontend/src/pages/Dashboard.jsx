@@ -103,8 +103,8 @@ export default function Dashboard() {
   return (
     <div className="page">
       <PageHeader
-        title="Dashboard"
-        subtitle="Overview of all reminder tasks across the team"
+        title="Team Performance"
+        subtitle="How the whole team is doing on its reminder tasks"
         meta={
           isAdmin && (
             <button type="button" className="link-btn generate-btn" disabled={archiving} onClick={archiveNow}

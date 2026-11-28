@@ -72,7 +72,7 @@ export default function WsDashboard() {
   return (
     <div className="page">
       <PageHeader
-        title="Workshop dashboard"
+        title="Team Performance"
         subtitle="How the whole team is doing on workshop tasks. Visible to everyone."
         meta={data && (
           <>

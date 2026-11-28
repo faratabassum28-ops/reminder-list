@@ -28,8 +28,8 @@ const ReminderSettings = lazyRetry(() => import("./Settings.jsx"));
 const APPS = [
   {
     id: "reminder", name: "Reminder List", tone: "#6d4fc0", Logo, home: "/", settings: "/settings",
-    blurb: "Recurring tasks, doers, the Master log and the performance dashboard.",
-    roles: [["Admin", "Everything: Doer List, Settings, Users, deleting data"], ["Member", "Dashboard plus their own Master rows; can complete and edit their own tasks"]],
+    blurb: "Recurring tasks, doers, the Master log and Team Performance.",
+    roles: [["Admin", "Everything: Doer List, Settings, Users, deleting data"], ["Member", "Team Performance plus their own Master rows; can complete and edit their own tasks"]],
   },
   {
     id: "workshop", name: "Workshop PMS", tone: "#e0912b", Logo: WorkshopLogo, home: "/workshops", settings: "/workshops/templates",

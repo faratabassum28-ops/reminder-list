@@ -115,7 +115,7 @@ export default function Layout() {
         <button className="side-search" onClick={() => setPalette(true)} title="Search (Ctrl K)"><Icon name="search" size={16} /><span className="nav-label">Search…</span><kbd>Ctrl K</kbd></button>
         <nav>
           <Link to="/" end icon="home" label="Home" />
-          {can.manage && <Link to="/performance" icon="trophy" label="Team performance" />}
+          {can.manage && <Link to="/performance" icon="trophy" label="Team Performance" />}
           <div className="nav-group">Programs</div>
           {(nav.data || []).map((p) => <Link key={p._id} to={`/p/${p._id}`} icon="book" label={p.name} />)}
           <div className="nav-group">Work</div>
