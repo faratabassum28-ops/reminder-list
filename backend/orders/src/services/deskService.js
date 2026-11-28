@@ -620,7 +620,15 @@ async function createManifest(user, { courier, orderIds, provider }) {
             console.log('[manifest] Shiprocket reply (after pickup) for', want, ':', rawReply);
             const again = require('../lib/shiprocketManifest').parseShiprocketManifest(reply, sent);
             if (again.manifestId) out = again;
-            else { const pkMsg = pk && pk.data && (pk.data.message || (pk.data.response && pk.data.response.data) || '') ; out = { ...again, rejected: again.rejected.map((r) => ({ ...r, reason: `${r.reason}${pkMsg ? ` (pickup request said: ${String(pkMsg).slice(0, 200)})` : ''}` })) }; }
+            else {
+              const pkMsg = pk && pk.data && (pk.data.message || (pk.data.response && pk.data.response.data) || '');
+              // Say what Shiprocket currently shows for each refused order (status + AWB), so the team can see WHY without opening Shiprocket.
+              const seen = new Map();
+              for (const r of again.rejected.slice(0, 8)) {
+                try { const g = await client.getOrderShipment(r.orderId); const o = g && g.found && g.response && g.response.order; if (o) { const st = client.simple(o); seen.set(r.orderId, `Shiprocket shows it as "${st.status || 'unknown'}"${st.awb ? `, AWB ${st.awb}` : ', no AWB'}`); } } catch (e) { /* the reason below still stands */ }
+              }
+              out = { ...again, rejected: again.rejected.map((r) => ({ ...r, reason: `${r.reason}${pkMsg ? ` (pickup request said: ${String(pkMsg).slice(0, 200)})` : ''}${seen.has(r.orderId) ? `. ${seen.get(r.orderId)}.` : ''}` })) };
+            }
           } catch (e) { console.log('[manifest] Shiprocket pickup/retry failed:', e.message); }
         }
         out.rejected = [...pre, ...out.rejected];
