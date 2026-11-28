@@ -527,7 +527,7 @@ export default function DispatchBoard() {
   const [toast, show] = useToast();
   const [open, setOpen] = useState(null);
   const assign = useAssign({ reload, show });
-  const [stage, setStage] = usePersisted('dq.stage', 'slip', COLS.map((c) => c.key)); // 'slip' | 'manifest' | 'packed' | 'handover'
+  const [stage, setStage] = useState('slip'); // 'slip' | 'manifest' | 'packed' | 'handover'. Always opens on Step 1 (Packing slip).
   const [view, setView] = usePersisted('dq.view', '', ['', ...PROVIDERS]); // '' = every service, or one
   const [slipping, setSlipping] = useState(null); const [typing, setTyping] = useState(null); const [packing, setPacking] = useState(null); const [handing, setHanding] = useState(null); const [handingManifest, setHandingManifest] = useState(null); const [making, setMaking] = useState(null); // making = a service key | null
   const [holding, setHolding] = useState(null); const [resuming, setResuming] = useState(null); const [cancelling, setCancelling] = useState(null);
