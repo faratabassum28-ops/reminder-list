@@ -13,6 +13,7 @@ import { PROVIDERS, ProviderBadge, providerLabel } from '../../providers.jsx';
 function manifestHint(prov, message) {
   const m = String(message || '').toLowerCase();
   if (prov === 'shipway' && /only for processed|processed orders/.test(m)) return 'In Shipway this order is not "Processed" yet. Process it there first (assign the courier and generate the AWB / label), then create the manifest again.';
+  if (prov === 'shiprocket' && /shows it as "(rto[^"]*|[^"]*(delivered|in transit|out for delivery|cancel)[^"]*)"/.test(m)) return 'This shipment has already left or is coming back, so it cannot be manifested. Do not create another manifest: wait for it, or reship it with a new AWB (new shipment in Shiprocket), or cancel the order here.';
   if (prov === 'shiprocket' && /manifest not generated/.test(m)) return 'In Shiprocket the order needs an AWB and a scheduled pickup before a manifest can be made. Generate the pickup in Shiprocket, then try again (an order already on a manifest is refused too).';
   if (/not serviceable/.test(m)) return 'The courier cannot pick up from or deliver to this pincode. Change the courier in the courier\'s dashboard.';
   return '';

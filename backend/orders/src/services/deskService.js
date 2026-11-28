@@ -585,16 +585,24 @@ async function createManifest(user, { courier, orderIds, provider }) {
     if (!allowed.length) throw httpErr(409, `No packed ${want} orders are waiting for a ${label} manifest.${skipped.length ? ` ${skipped.length} are assigned to someone else.` : ''}`);
     const batch = allowed.slice(0, DP.MAX_HANDOVER_BATCH);
     const leftOver = allowed.length - batch.length;
-    const known = await ShipwayShipment.find({ orderId: { $in: batch.map((d) => d.orderId) } }).select('orderId shipwayOrderId shipmentId provider').lean();
-    const kmap = new Map(known.filter((k) => (k.provider || 'shipway') === prov).map((k) => [k.orderId, k]));
+    const readKnown = async () => new Map((await ShipwayShipment.find({ orderId: { $in: batch.map((d) => d.orderId) } }).select('orderId shipwayOrderId shipmentId provider status checkedAt').lean()).filter((k) => (k.provider || 'shipway') === prov).map((k) => [k.orderId, k]));
+    let kmap = await readKnown();
+    // Look at what the courier shows for each order NOW (only when the saved status is older than 10 minutes). An order that has already gone out,
+    // is on its way back (RTO), was delivered or cancelled can never go on a manifest: say so up front instead of asking the courier and getting a refusal.
+    const syncSvc = require('./shipwaySync');
+    for (const d of batch) { const k = kmap.get(d.orderId); if (!k || !k.checkedAt || Date.now() - new Date(k.checkedAt).getTime() > 10 * 60000) { try { await syncSvc.refreshOne(d.orderId, prov); } catch (e) { /* the courier is asked anyway below */ } } }
+    kmap = await readKnown();
+    const MOVING = /(\brto\b|return|deliver|in[\s-]?transit|out for|cancel|\blost\b|picked[\s-]?up)/i;
+    const blocked = []; const live = [];
+    for (const d of batch) { const k = kmap.get(d.orderId); if (k && k.status && MOVING.test(k.status)) blocked.push({ orderId: d.orderId, reason: `${label} shows this order as "${k.status}", so it cannot go on a manifest. It has already left or is coming back: reship it with a new AWB, or cancel it here.` }); else live.push(d); }
     let sent; let reply; let out;
-    const pre = []; // orders we could not even send (Shiprocket shipment id unknown)
+    const pre = [...blocked]; // orders we could not even send (already moving, or Shiprocket shipment id unknown)
 
     if (prov === 'shiprocket') {
       // A Shiprocket manifest is made from shipment ids. Look up any we do not have yet.
       const sync = require('./shipwaySync');
       const have = []; 
-      for (const d of batch) {
+      for (const d of live) {
         let k = kmap.get(d.orderId);
         if (!k || !k.shipmentId) { try { await sync.refreshOne(d.orderId, 'shiprocket'); k = await ShipwayShipment.findOne({ orderId: d.orderId, provider: 'shiprocket', found: true }).select('orderId shipmentId').lean(); } catch (e) { k = null; } }
         if (k && k.shipmentId) have.push({ orderId: d.orderId, shipmentId: k.shipmentId }); else pre.push({ orderId: d.orderId, reason: 'Shiprocket has no shipment for this order yet. Create it in Shiprocket, then try again.' });
@@ -635,12 +643,14 @@ async function createManifest(user, { courier, orderIds, provider }) {
         out.rawReply = out.manifestId ? undefined : rawReply;
       }
     } else {
-      sent = batch.map((d) => ({ orderId: d.orderId, shipwayId: client.shipwayIdFor(d.orderId, kmap.get(d.orderId) && kmap.get(d.orderId).shipwayOrderId) }));
-      try { reply = await client.createManifest({ orders: sent, courier: (batch[0].dq.packed && batch[0].dq.packed.courier) || want }); }
+      sent = live.map((d) => ({ orderId: d.orderId, shipwayId: client.shipwayIdFor(d.orderId, kmap.get(d.orderId) && kmap.get(d.orderId).shipwayOrderId) }));
+      if (!sent.length) return { provider: prov, providerLabel: label, manifestId: null, manifestUrl: '', courier: want, created: [], rejected: await (async () => { for (const r of blocked) { try { await applyTransition(batch.find((d) => d.orderId === r.orderId), DP.manifestRejected(batch.find((d) => d.orderId === r.orderId), { reason: r.reason, courier: want }, user), { assign: false }); } catch (e) { /* the reason is still returned to the screen */ } } return blocked; })(), failed: [], skipped, leftOver, shipwayMessage: '' };
+      try { reply = await client.createManifest({ orders: sent, courier: (live[0].dq.packed && live[0].dq.packed.courier) || want }); }
       catch (e) { throw httpErr(502, e.message || 'Shipway could not be reached. Nothing was changed.'); } // 502, not 401: a provider login problem must not sign the person out
       const rawReply = (() => { try { return JSON.stringify(reply).slice(0, 1500); } catch { return String(reply).slice(0, 1500); } })();
       console.log('[manifest] Shipway reply for', want, ':', rawReply); // so support can see exactly what Shipway sent
       out = require('../lib/manifest').parseManifestReply(reply, sent);
+      out.rejected = [...blocked, ...out.rejected];
       if (out.noId) return { provider: prov, manifestId: null, courier: want, created: [], rejected: [], failed: [], skipped, leftOver, shipwayMessage: out.message, noId: true, rawReply };
       out.rawReply = out.manifestId ? undefined : rawReply;
     }
